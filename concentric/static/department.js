@@ -1,43 +1,65 @@
-// The department chart — 24 seats on three concentric rings, live.
+// The department chart — 24 seats on three concentric rings, each holding its
+// own inner flow, live.
 //
 // Served by `python -m concentric.dashboard` at /department.js and injected into
-// waku's shell by the launcher. It adds ONE rail item and ONE view; waku's files
-// on disk are never touched, so the stock dashboard and its tests are unaffected.
+// waku's shell by the launcher. One rail item, one view; waku's files are never
+// touched.
 //
-// It reuses waku's globals (VIEWS, esc, uiCard, hot) and its design tokens, and
-// its live animation follows the same rule as diagram.js: the trace stream drives
-// it, so a turn started in the CLI or the dock beats here too.
+// Every seat IS a Waku, so every seat runs the same internal flow. We draw a
+// compact version of it inside each block — in -> gate -> llm -> tools -> out —
+// and beat the part that is active. It is NOT archSVG: archSVG's ids are global
+// and its live animation selects them globally, so 24 copies would light all 24
+// at once. These parts are scoped by data-seat, so only the working seat beats.
 (function () {
-  const ARC = 88;              // the slice of the outer ring one team owns
-  const R1 = 155, R2 = 330;    // the CFO ring and the worker ring
-  const W = 940, H = 900;
-  const BEAT_MS = 1200;
+  const ARC = 88;                 // the slice of the outer ring one team owns
+  const R1 = 300, R2 = 660;       // the CFO ring and the worker ring
+  const W = 1640, H = 1640;
+  const BEAT_MS = 1400;
+
+  // The four stages drawn inside every seat, left to right. Each maps to the
+  // trace event that lights it — the same idea as diagram.js's STAGE map.
+  const PARTS = [
+    { key: "gate", label: "gate" },
+    { key: "llm", label: "llm" },
+    { key: "tool", label: "tool" },
+    { key: "out", label: "out" },
+  ];
+  const EVENT_PART = { gate: "gate", llm: "llm", tool: "tool", turn_end: "out" };
 
   const polar = (cx, cy, r, deg) => {
     const a = (deg * Math.PI) / 180;
     return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
   };
 
+  const SIZES = { 0: [260, 96], 1: [230, 84], 2: [190, 64] };
+
   const CSS = `
-  .dep-wrap{display:flex;justify-content:center}
-  .dep{width:100%;max-width:940px;height:auto}
+  .dep-wrap{display:flex;justify-content:center;overflow:auto}
+  .dep{width:100%;min-width:1180px;max-width:1640px;height:auto}
   .dep-ring{fill:none;stroke:var(--border,#dce6f2);stroke-width:1.4}
   .dep-ring-cfo{stroke:var(--warn,#b36b00);stroke-dasharray:8 6;opacity:.45}
   .dep-arc{fill:none;stroke:var(--warn,#b36b00);stroke-width:2;stroke-dasharray:8 6;opacity:.5}
-  .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:1.1}
-  .dep-edge.live{stroke:var(--accent,#2e6db4);stroke-width:2.6}
-  .dep-node rect{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.3;
+  .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:1.2}
+  .dep-edge.live{stroke:var(--accent,#2e6db4);stroke-width:3}
+  .dep-card{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.4}
+  .dep-r0 .dep-card{fill:var(--accent,#1e4e8c);stroke:#0a1b3a}
+  .dep-r1 .dep-card{fill:var(--accent-soft,#eaf2fb);stroke:var(--accent,#1e4e8c)}
+  .dep-title{font-size:14px;fill:var(--text,#0a1b3a);font-family:inherit;pointer-events:none}
+  .dep-r0 .dep-title{fill:#fff;font-weight:700}
+  .dep-node.cold .dep-card{opacity:.42}
+  .dep-part rect{fill:var(--surface,#fff);stroke:var(--border,#9dc2e8);stroke-width:1;
     transform-box:fill-box;transform-origin:center}
-  .dep-node text{font-size:11px;fill:var(--text,#0a1b3a);font-family:inherit;pointer-events:none}
-  .dep-r0 rect{fill:var(--accent,#1e4e8c)}
-  .dep-r0 text{fill:#fff;font-weight:700;font-size:12.5px}
-  .dep-r1 rect{fill:var(--accent-soft,#eaf2fb);stroke:var(--accent,#1e4e8c)}
-  .dep-node.cold rect{opacity:.4}
-  .dep-node.hot rect{stroke-width:3;animation:dep-beat .55s ease-in-out 3}
-  @keyframes dep-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+  .dep-part text{font-size:11px;fill:var(--muted,#5a6b80);font-family:inherit;pointer-events:none}
+  .dep-r0 .dep-part rect{fill:#2a63a8;stroke:#7fa8d6}
+  .dep-r0 .dep-part text{fill:#dbe8f7}
+  .dep-part.hot rect{fill:var(--warn,#b36b00);stroke:var(--warn,#b36b00);
+    animation:dep-beat .55s ease-in-out 3}
+  .dep-part.hot text{fill:#fff;font-weight:700}
+  .dep-node.beat .dep-card{stroke-width:3.4}
   .dep-legend{display:flex;gap:var(--space-4);flex-wrap:wrap;margin-top:var(--space-3)}
   .dep-key{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted,#5a6b80)}
   .dep-swatch{width:14px;height:10px;border-radius:3px;border:1.3px solid var(--border,#2e6db4)}
+  @keyframes dep-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
   `;
 
   function style() {
@@ -48,7 +70,7 @@
     document.head.appendChild(el);
   }
 
-  function layout(dep) {
+  function positions(dep) {
     const cx = W / 2, cy = H / 2;
     const pos = {};
     dep.seats.forEach((s) => {
@@ -59,8 +81,24 @@
     return { cx, cy, pos };
   }
 
+  // The inner flow: four stage boxes in a row, each carrying data-part so the
+  // live layer can beat just that one.
+  function innerFlow(ring, w, h) {
+    const bw = 38, bh = 20, gap = 6;
+    const total = PARTS.length * bw + (PARTS.length - 1) * gap;
+    const x0 = (w - total) / 2;
+    const y = h - bh - 10;
+    return PARTS.map((p, i) => {
+      const x = x0 + i * (bw + gap);
+      return `<g class="dep-part" data-part="${p.key}">`
+        + `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="5"/>`
+        + `<text x="${x + bw / 2}" y="${y + bh / 2 + 4}" text-anchor="middle">${p.label}</text>`
+        + `</g>`;
+    }).join("");
+  }
+
   function departmentSVG(dep) {
-    const { cx, cy, pos } = layout(dep);
+    const { cx, cy, pos } = positions(dep);
     const p = [];
 
     p.push(`<circle class="dep-ring" cx="${cx}" cy="${cy}" r="${R2}"/>`);
@@ -81,19 +119,19 @@
 
     dep.seats.forEach((s) => {
       const [x, y] = pos[s.role];
-      const w = s.ring === 0 ? 190 : s.ring === 1 ? 180 : 152;
-      const h = s.ring === 0 ? 56 : s.ring === 1 ? 46 : 28;
+      const [w, h] = SIZES[s.ring];
       const cls = `dep-node dep-r${s.ring} ${s.built ? "built" : "cold"}`;
-      p.push(`<g class="${cls}" data-node="${s.role}" `
+      p.push(`<g class="${cls}" data-seat="${s.role}" `
         + `transform="translate(${x - w / 2},${y - h / 2})">`
-        + `<rect width="${w}" height="${h}" rx="9"/>`
-        + `<text x="${w / 2}" y="${h / 2 + 4}" text-anchor="middle">${esc(s.title)}</text>`
+        + `<rect class="dep-card" width="${w}" height="${h}" rx="10"/>`
+        + `<text class="dep-title" x="${w / 2}" y="24" text-anchor="middle">${esc(s.title)}</text>`
+        + innerFlow(s.ring, w, h)
         + `</g>`);
     });
 
     return `<div class="dep-wrap"><svg class="dep" viewBox="0 0 ${W} ${H}" role="img"`
-      + ` aria-label="The department: ${dep.seats.length} seats on three concentric rings">`
-      + `${p.join("")}</svg></div>`;
+      + ` aria-label="The department: ${dep.seats.length} seats on three concentric rings,`
+      + ` each holding its own flow">${p.join("")}</svg></div>`;
   }
 
   function legend() {
@@ -101,30 +139,39 @@
       + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent,#1e4e8c)"></i>Irina - ring 0</span>`
       + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent-soft,#eaf2fb)"></i>CFO - ring 1</span>`
       + `<span class="dep-key"><i class="dep-swatch"></i>worker - ring 2</span>`
+      + `<span class="dep-key">every seat holds the same flow: gate - llm - tool - out</span>`
+      + `<span class="dep-key">the part that is working beats</span>`
       + `<span class="dep-key">solid line = delegation, one level down</span>`
-      + `<span class="dep-key">amber dash = a round table (peers)</span>`
       + `</div>`;
   }
 
-  // ---- live: a seat beats while it is working, and its outgoing edge lights.
-  // We repaint from a map instead of toggling classes directly, because the
-  // dashboard re-renders the view on its 5s refresh and that would wipe a class
+  // ---- live. Repaint from maps rather than toggling classes directly: the
+  // dashboard re-renders the view on its 5s refresh, which would wipe a class
   // set by a plain setTimeout.
-  const active = new Map();     // role -> expiry (ms since epoch)
+  const activePart = new Map();   // "<role>:<part>" -> expiry
+  const activeSeat = new Map();   // "<role>"        -> expiry
 
   function paint() {
     const now = Date.now();
-    const live = (role) => (active.get(role) || 0) > now;
     document.querySelectorAll(".dep-node").forEach((el) => {
-      el.classList.toggle("hot", live(el.getAttribute("data-node")));
+      el.classList.toggle("beat", (activeSeat.get(el.getAttribute("data-seat")) || 0) > now);
+    });
+    document.querySelectorAll(".dep-part").forEach((el) => {
+      const seat = el.closest(".dep-node").getAttribute("data-seat");
+      const key = seat + ":" + el.getAttribute("data-part");
+      el.classList.toggle("hot", (activePart.get(key) || 0) > now);
     });
     document.querySelectorAll(".dep-edge").forEach((el) => {
-      el.classList.toggle("live", live(el.getAttribute("data-src")));
+      el.classList.toggle("live", (activeSeat.get(el.getAttribute("data-src")) || 0) > now);
     });
   }
 
   function beat(ev) {
-    if (ev && ev.role) active.set(ev.role, Date.now() + BEAT_MS);
+    if (!ev || !ev.role) return;
+    const until = Date.now() + BEAT_MS;
+    activeSeat.set(ev.role, until);
+    const part = EVENT_PART[ev.type];
+    if (part) activePart.set(ev.role + ":" + part, until);
   }
 
   let cursor = null;
@@ -145,15 +192,14 @@
   VIEWS.department = (d) => {
     const dep = d.department;
     const head = `<div class="meta" style="margin-bottom:var(--space-3)">Twenty-four seats on three
-      rings: Irina at the centre, the four CFOs on the inner round table, nineteen workers on the
-      outer. A seat <b>beats</b> while it is working and the edge lights as a delegation fires -
-      driven by the trace, so a turn started in the CLI or the dock animates here too.</div>`;
+      rings. Each seat is a full waku agent, so each block holds the same inner flow -
+      <b>gate - llm - tool - out</b> - and the part that is working <b>beats</b>. Driven by the
+      trace, so a turn started in the CLI or the dock animates here too.</div>`;
     if (!dep) return head + uiCard(`<span class="empty">no department payload</span>`);
     const built = dep.seats.filter((s) => s.built).length;
-    const edges = dep.edges.length;
     setTimeout(paint, 0);   // re-apply beats after this render replaces the DOM
     return head + departmentSVG(dep) + legend()
       + uiCard(`<div class="meta">${built} of ${dep.seats.length} seats have run &middot;
-        ${edges} delegation edges. Grey = never used.</div>`);
+        ${dep.edges.length} delegation edges. Grey = never used.</div>`);
   };
 })();
