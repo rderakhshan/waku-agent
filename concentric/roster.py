@@ -4,9 +4,13 @@ Edges are never stored. `children`/`peers` compute them from `parent` and
 `ring`, so the topology cannot drift from the roster, and scope is a lookup
 rather than a rule someone has to remember.
 
-The 24 roles and their placement come from the concentric figure
-(Implementation/assets/make_concentric.py): ring 1 is the four CFOs, ring 2 is
-each CFO's team laid along an 88-degree arc.
+There is deliberately no geometry here. A `ring` is a fact about the graph
+(0 = Irina, 1 = CFO, 2 = worker); how a view chooses to draw it is the view's
+business. An `arc_angle` used to live on SeatSpec for a concentric picture, and
+keeping it made a cosmetic change look structural — nothing that enforces scope
+or depth ever read it.
+
+The 24 roles come from Implementation/assets/make_concentric.py.
 """
 
 from __future__ import annotations
@@ -14,25 +18,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 MAX_RING = 2
-ARC = 88.0
-
-_CFO_ANGLES = {
-    "cfo-1-development": -90.0,
-    "cfo-2-validation": 0.0,
-    "cfo-3-governance": 90.0,
-    "cfo-4-audit": 180.0,
-}
 
 
 @dataclass(frozen=True)
 class SeatSpec:
-    """One role. Identity, placement and mandate — no behaviour."""
+    """One role. Identity and mandate — no behaviour, no placement."""
 
     role: str        # slug, e.g. "cfo-2-validation"
     title: str       # display, e.g. "CFO-2 - Validation & monitoring"
     ring: int        # 0 = Irina, 1 = CFO, 2 = worker
     parent: str      # the role's manager ("" for Irina)
-    arc_angle: float  # ring-2 placement; 0.0 on rings 0 and 1
     mandate: str     # one line, the seat's remit
 
 
@@ -104,14 +99,11 @@ _TEAMS = (
 
 
 def _build() -> tuple[SeatSpec, ...]:
-    seats = [SeatSpec(_IRINA[0], _IRINA[1], 0, "", 0.0, _IRINA[2])]
+    seats = [SeatSpec(_IRINA[0], _IRINA[1], 0, "", _IRINA[2])]
     for cfo_role, cfo_title, cfo_mandate, members in _TEAMS:
-        angle = _CFO_ANGLES[cfo_role]
-        seats.append(SeatSpec(cfo_role, cfo_title, 1, "irina", angle, cfo_mandate))
-        step = ARC / len(members)
-        for i, (role, title, mandate) in enumerate(members):
-            seats.append(SeatSpec(role, title, 2, cfo_role,
-                                  angle - ARC / 2 + step * (i + 0.5), mandate))
+        seats.append(SeatSpec(cfo_role, cfo_title, 1, "irina", cfo_mandate))
+        for role, title, mandate in members:
+            seats.append(SeatSpec(role, title, 2, cfo_role, mandate))
     return tuple(seats)
 
 

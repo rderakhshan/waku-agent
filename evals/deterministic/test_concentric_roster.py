@@ -68,10 +68,15 @@ def test_irina_has_no_peers_and_no_parent():
     assert roster.BY_ROLE["irina"].parent == ""
 
 
-def test_arc_angles_are_distinct_within_a_team():
-    for cfo in roster.children("irina"):
-        angles = [s.arc_angle for s in roster.SEATS if s.parent == cfo]
-        assert len(set(angles)) == len(angles)
+def test_the_roster_carries_no_geometry():
+    """Placement belongs to the view. A `ring` is a fact about the graph; an
+    angle was only ever how one picture drew it, and keeping it in the data
+    model made a cosmetic change look structural."""
+    import dataclasses
+
+    names = {f.name for f in dataclasses.fields(roster.SeatSpec)}
+    assert "arc_angle" not in names
+    assert {"role", "title", "ring", "parent", "mandate"} <= names
 
 
 def test_max_ring_matches_the_deepest_seat():
