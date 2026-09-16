@@ -96,7 +96,8 @@ def build() -> str:
 
     p = [
         (f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" '
-         f'viewBox="0 0 {W} {H}" font-family="Segoe UI, Helvetica, Arial, sans-serif">'),
+         f'viewBox="0 0 {W} {H}" font-family="\'ING Me\', \'Instrument Sans\', '
+         f"'Segoe UI', Helvetica, Arial, sans-serif\">"),
         "<defs>",
         ('<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">'
          '<stop offset="0%" stop-color="#FCFDFF"/><stop offset="100%" stop-color="#EDF3FA"/>'

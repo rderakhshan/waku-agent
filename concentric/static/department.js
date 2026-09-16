@@ -37,7 +37,12 @@
 
   const CSS = `
   .dep-wrap{display:flex;justify-content:center;overflow:auto}
-  .dep{width:100%;min-width:900px;max-width:1240px;height:auto}
+  /* ING Me is ING's proprietary corporate typeface and is not redistributed
+     here. It is simply named first: a machine that has it installed renders
+     with it, everyone else falls through to the bundled Instrument Sans (OFL)
+     and then the system stack. Nothing proprietary enters the repo. */
+  .dep{width:100%;min-width:900px;max-width:1240px;height:auto;
+    font-family:"ING Me","Instrument Sans","Segoe UI",Helvetica,Arial,sans-serif}
   .dep-wheel{fill:none;stroke:var(--border,#dce6f2);stroke-width:1.4;stroke-dasharray:6 6;
     opacity:.7}
   .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:1.3;fill:none}
