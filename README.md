@@ -5,6 +5,12 @@
 
 # Irina-AI Powered Model Risk Management
 
+> **Irina is under constant development.** The department runs end to end — delegation, scope and
+> depth are enforced in code — but the prompts in this README are tuned for demonstration. For
+> real use cases, expect to tune both sides: the role mandates in `concentric/roster.py` (a seat's
+> mandate is what it thinks it may do) and how you phrase the task. A vague ask gets a vague
+> delegation.
+
 **A department of AI agents for model risk management, in code you can read.**
 
 Irina is built on **[waku-agent](https://github.com/ShenSeanChen/waku-agent)** — a local-first
@@ -58,11 +64,6 @@ Irina delegates to three CFOs; each one tasks the named worker in its team; the 
 other where their answers overlap; and the answer comes back up as a single plan. In the
 dashboard you can watch it: the spokes light as each seat is tasked, and the faint chords between
 CFOs turn solid when they compare notes.
-
-> **Irina is under constant development.** The department runs end to end — delegation, scope and
-> depth are enforced in code — but these prompts are tuned for demonstration. For real use cases,
-> expect to tune both sides: the role mandates in `concentric/roster.py` (a seat's mandate is what
-> it thinks it may do) and how you phrase the task. A vague ask gets a vague delegation.
 
 ## Quickstart
 
