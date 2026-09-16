@@ -139,7 +139,8 @@ _SCRIPT = '<script src="/department.js"></script>\n'
 _BRAND = ('<style>\n'
           '.r-top .mark{-webkit-mask:url(/irina-mark.svg) center/contain no-repeat;'
           'mask:url(/irina-mark.svg) center/contain no-repeat}\n'
-          '</style>\n')
+          '</style>\n'
+          '<link rel="stylesheet" href="/ui.css">\n')
 
 
 def _inject(html: str) -> str:
@@ -175,6 +176,10 @@ def _handler_class():
             if path == "/irina-mark.svg":
                 body = (Path(__file__).parent / "static" / "irina-mark.svg").read_bytes()
                 self._send(body, "image/svg+xml", no_cache=True)
+                return
+            if path == "/ui.css":
+                body = (Path(__file__).parent / "static" / "ui.css").read_bytes()
+                self._send(body, "text/css", no_cache=True)
                 return
             if path == "/":
                 html = (wd.STATIC / "index.html").read_text(encoding="utf-8")

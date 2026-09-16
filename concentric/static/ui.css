@@ -1,0 +1,423 @@
+/* Irina's dashboard — the enhancement layer.
+ *
+ * Served by `python -m concentric.dashboard` at /ui.css and linked at the end of
+ * <head>, so it wins against waku's style.css at equal specificity. waku/ is not
+ * touched, and this file holds no logic — it restyles the markup that is already
+ * there.
+ *
+ * The direction: waku's system is deliberately flat — 2px radius, no shadows,
+ * hairlines everywhere. That is honest and legible, and it also reads as plain.
+ * So this layer adds DEPTH rather than new colour: softer radii, layered
+ * shadows, a tinted ground, a glass rail, and motion on the things you touch.
+ *
+ * Two rules it keeps:
+ *   1. Colour comes from waku's tokens, so light and dark both follow. The only
+ *      literal is transparent black, which is shadow.
+ *   2. Nothing here changes a size, a position or an order. If a layout breaks
+ *      it is this file's fault, and the fix belongs here.
+ */
+
+/* ── 1. the token layer, deepened ───────────────────────────────────────────
+   These three are the whole reason the rest of the file is short. waku ships
+   --radius: 2px and --shadow-*: none, and every primitive derives from them, so
+   redefining them here lifts the entire surface at once. */
+:root,
+[data-theme] {
+  --radius: 12px;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04), 0 1px 1px rgb(0 0 0 / 0.03);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 18px 40px -12px rgb(0 0 0 / 0.18), 0 6px 14px -6px rgb(0 0 0 / 0.10);
+  --irina-glow: 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent),
+                0 6px 18px -6px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+/* ── 2. the ground ──────────────────────────────────────────────────────────
+   Two very soft accent blooms behind everything, so the page is not one flat
+   fill. Fixed, so it does not scroll or shimmer. */
+body {
+  background-image:
+    radial-gradient(1100px 520px at 12% -8%,
+      color-mix(in srgb, var(--accent) 9%, transparent), transparent 62%),
+    radial-gradient(900px 460px at 96% 4%,
+      color-mix(in srgb, var(--text-ink) 6%, transparent), transparent 58%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── 3. the rail ────────────────────────────────────────────────────────────
+   Glass instead of a flat block, and an active row that reads as a place you
+   are rather than a link that is bold. */
+.rail {
+  background: color-mix(in srgb, var(--surface-paper) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border-right: var(--rule-width) solid var(--rule);
+}
+.r-top {
+  border-bottom: none;
+  padding-bottom: var(--space-3);
+}
+.r-top .mark {
+  border-radius: 9px;
+  padding: 3px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.r-name {
+  letter-spacing: 0.22em;
+  font-weight: 600;
+  font-size: var(--text-xs);
+}
+.r-grp {
+  letter-spacing: 0.18em;
+  opacity: 0.75;
+  margin-top: var(--space-4);
+}
+.rail > a {
+  border-radius: 10px;
+  margin: 2px var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  transition: background var(--motion-fast) var(--motion-ease),
+              color var(--motion-fast) var(--motion-ease),
+              transform var(--motion-fast) var(--motion-ease);
+}
+.rail > a:hover {
+  background: color-mix(in srgb, var(--text-ink) 7%, transparent);
+  transform: translateX(2px);
+}
+.rail > a.on {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 26%, transparent),
+    color-mix(in srgb, var(--accent) 8%, transparent));
+  box-shadow: inset 3px 0 0 var(--accent);
+  font-weight: 600;
+}
+.r-gh, #theme-toggle { border-radius: 8px; }
+.r-gh:hover, #theme-toggle:hover { background: color-mix(in srgb, var(--text-ink) 8%, transparent); }
+
+/* ── 4. the page head ───────────────────────────────────────────────────────
+   A hairline under the header, a title with a little more presence. */
+.pagehead { padding-bottom: var(--space-3); }
+.ph-row h1, #title {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.pagehead::after {
+  content: "";
+  display: block;
+  height: 1px;
+  margin-top: var(--space-3);
+  background: linear-gradient(90deg, var(--rule), transparent);
+}
+.sub { opacity: 0.85; }
+
+/* ── 5. cards ───────────────────────────────────────────────────────────────
+   Paper, a soft edge, and a lift on hover — but only on cards that are
+   actually interactive, so a static panel does not twitch. */
+.card {
+  border-radius: var(--radius);
+  border: var(--rule-width) solid var(--rule);
+  background: linear-gradient(180deg,
+    var(--surface-paper),
+    color-mix(in srgb, var(--surface-paper) 88%, var(--surface-bg)));
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--motion-fast) var(--motion-ease),
+              transform var(--motion-fast) var(--motion-ease),
+              border-color var(--motion-fast) var(--motion-ease);
+}
+.card:hover { box-shadow: var(--shadow-md); }
+.card[onclick]:hover, .list-row[onclick]:hover, .conncard:hover, .provcard:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--rule));
+}
+.card-head { padding-bottom: var(--space-2); }
+.card-title { font-weight: 650; letter-spacing: -0.01em; }
+
+/* ── 6. the stat band ───────────────────────────────────────────────────────
+   The numbers are the point of the Overview, so they get the size. */
+.stat-band {
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  border: var(--rule-width) solid var(--rule);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--surface-paper) 92%, var(--accent)),
+    var(--surface-paper));
+  box-shadow: var(--shadow-sm);
+}
+.stat {
+  border-right: var(--rule-width) solid var(--rule);
+  padding-right: var(--space-4);
+}
+.stat-label {
+  letter-spacing: 0.16em;
+  opacity: 0.8;
+}
+.stat-value {
+  font-size: 1.65rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  background: linear-gradient(180deg, var(--text-ink), color-mix(in srgb, var(--text-ink) 72%, var(--surface-bg)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.stat-value.ok {
+  background: linear-gradient(180deg, var(--ok), color-mix(in srgb, var(--ok) 70%, var(--surface-bg)));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.stat-sub { opacity: 0.75; }
+
+/* ── 7. tables ──────────────────────────────────────────────────────────────
+   Rounded, striped, and a hover that tells you which row your eye is on. */
+.tbl-wrap {
+  border-radius: var(--radius);
+  border: var(--rule-width) solid var(--rule);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  background: var(--surface-paper);
+}
+.tbl th {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 0.72em;
+  background: color-mix(in srgb, var(--text-ink) 5%, var(--surface-paper));
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.tbl tr:hover td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.tbl td, .tbl th { border-color: var(--rule); }
+.tbl tr:last-child td { border-bottom: none; }
+
+/* ── 8. badges and chips ────────────────────────────────────────────────────
+   A soft tint behind the label rather than a solid block, so a row of them
+   does not shout. */
+.badge {
+  border-radius: var(--shape-chip);
+  padding: 2px 10px;
+  border: var(--rule-width) solid transparent;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.badge-ok { background: color-mix(in srgb, var(--ok) 14%, transparent); border-color: color-mix(in srgb, var(--ok) 34%, transparent); color: var(--ok); }
+.badge-warn { background: color-mix(in srgb, var(--warn) 16%, transparent); border-color: color-mix(in srgb, var(--warn) 36%, transparent); color: var(--warn); }
+.badge-bad, .badge-miss { background: color-mix(in srgb, var(--bad) 14%, transparent); border-color: color-mix(in srgb, var(--bad) 34%, transparent); color: var(--bad); }
+.badge-live, .badge.retrieve { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.badge-value { background: color-mix(in srgb, var(--text-ink) 7%, transparent); }
+.chip, .srcpill, .pill { border-radius: var(--shape-chip); }
+
+/* ── 9. tabs ────────────────────────────────────────────────────────────────
+   A moving underline with an accent tick under the current one. */
+.tab { transition: color var(--motion-fast) var(--motion-ease); }
+.tab:hover { color: var(--text-ink); }
+.tab.on::after {
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 40%, transparent));
+}
+.tab-n {
+  border-radius: var(--shape-chip);
+  background: color-mix(in srgb, var(--text-ink) 8%, transparent);
+  padding: 1px 7px;
+  font-weight: 600;
+}
+
+/* ── 10. buttons ────────────────────────────────────────────────────────────
+   The primary gets the accent and a shadow; everything else stays quiet. All
+   of them move a hair on press so the interface feels alive. */
+.btn {
+  border-radius: 10px;
+  font-weight: 600;
+  transition: transform var(--motion-fast) var(--motion-ease),
+              box-shadow var(--motion-fast) var(--motion-ease),
+              background var(--motion-fast) var(--motion-ease),
+              border-color var(--motion-fast) var(--motion-ease);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn-primary {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 92%, white),
+    var(--accent));
+  color: var(--accent-ink);
+  border: var(--rule-width) solid color-mix(in srgb, var(--accent) 70%, var(--text-ink));
+  box-shadow: var(--irina-glow);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, var(--accent), var(--accent-hover));
+  box-shadow: 0 8px 22px -8px color-mix(in srgb, var(--accent) 65%, transparent);
+}
+.btn-secondary {
+  background: var(--surface-paper);
+  border: var(--rule-width) solid var(--rule-hard);
+  box-shadow: var(--shadow-sm);
+}
+.btn-secondary:hover {
+  background: color-mix(in srgb, var(--text-ink) 5%, var(--surface-paper));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--rule-hard));
+}
+.btn-tertiary:hover { background: color-mix(in srgb, var(--text-ink) 6%, transparent); border-radius: 8px; }
+.btn-sm { border-radius: 8px; }
+
+/* ── 11. fields ─────────────────────────────────────────────────────────────
+   A ring that appears on focus instead of a hard colour swap. */
+.fld input, .fld select, .chatbar input, .editor, .sqlbox, .cmp-input, .model-picker-input input {
+  border-radius: 10px;
+  transition: box-shadow var(--motion-fast) var(--motion-ease),
+              border-color var(--motion-fast) var(--motion-ease);
+}
+.fld input:focus, .chatbar input:focus, .editor:focus, .sqlbox:focus, .cmp-input:focus, .model-picker-input input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
+  outline: none;
+}
+
+/* ── 12. notices and list rows ─────────────────────────────────────────────── */
+.notice {
+  border-radius: var(--radius);
+  border-left-width: 3px;
+  box-shadow: var(--shadow-sm);
+}
+.notice-mark {
+  border-radius: 6px;
+  letter-spacing: 0.06em;
+}
+.list-row {
+  border-radius: 10px;
+  transition: background var(--motion-fast) var(--motion-ease),
+              transform var(--motion-fast) var(--motion-ease);
+}
+.list-row:hover { background: color-mix(in srgb, var(--text-ink) 5%, transparent); }
+.list-row.on {
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--accent) 20%, transparent), transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.list-title { font-weight: 600; letter-spacing: -0.005em; }
+
+/* ── 13. the chat dock ──────────────────────────────────────────────────────
+   The dock is where the department talks, so it gets the most care: a raised
+   panel, bubbles with a tail of depth, and the user's own turn tinted. */
+#dock {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--surface-paper) 96%, transparent),
+    var(--surface-paper));
+  border-left: var(--rule-width) solid var(--rule);
+  box-shadow: -14px 0 34px -22px rgb(0 0 0 / 0.22);
+}
+.dockhead {
+  border-bottom: var(--rule-width) solid var(--rule);
+  padding-bottom: var(--space-2);
+}
+.dockhead .dt { letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.72em; opacity: 0.85; }
+.msg, .bubble {
+  border-radius: 14px;
+  border: var(--rule-width) solid var(--rule);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--motion-fast) var(--motion-ease);
+}
+.msg:hover, .bubble:hover { box-shadow: var(--shadow-md); }
+.msg.user, .msg.user .bubble {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 16%, var(--surface-paper)),
+    color-mix(in srgb, var(--accent) 9%, var(--surface-paper)));
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--rule));
+}
+.msg.assistant, .msg.assistant .bubble {
+  background: var(--surface-paper);
+}
+.msg .who { letter-spacing: 0.1em; text-transform: uppercase; font-size: 0.72em; opacity: 0.8; }
+.chatbar {
+  border-top: var(--rule-width) solid var(--rule);
+  background: color-mix(in srgb, var(--surface-paper) 92%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.chatlog { scroll-behavior: smooth; }
+.caret { color: var(--accent); }
+
+/* ── 14. floating things ────────────────────────────────────────────────────
+   Menus and dialogs are the only surfaces that genuinely float, so they are
+   the only ones allowed a large shadow. */
+.menu {
+  border-radius: 12px;
+  border: var(--rule-width) solid var(--rule);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  background: var(--surface-paper);
+}
+.menu-item { transition: background var(--motion-fast) var(--motion-ease); }
+.menu-item:hover, .menu-item:focus-visible { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.menu-item.on { box-shadow: inset 3px 0 0 var(--accent); }
+.dialog {
+  border-radius: 16px;
+  border: var(--rule-width) solid var(--rule);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.dialog::backdrop {
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+}
+.modelchip {
+  border-radius: var(--shape-chip);
+  border: var(--rule-width) solid var(--rule);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow var(--motion-fast) var(--motion-ease);
+}
+.modelchip:hover { box-shadow: var(--shadow-md); }
+.resizer:hover, body.resizing .resizer { background: var(--accent); }
+
+/* ── 15. the architecture chart ─────────────────────────────────────────────
+   waku's boxes, softened. archSVG's own geometry is untouched — only the fill,
+   the edge and the glow change. */
+.arch .bx {
+  rx: 8px;
+  filter: drop-shadow(0 1px 2px rgb(0 0 0 / 0.06));
+  transition: filter var(--motion-fast) var(--motion-ease);
+}
+.arch .node:hover .bx { filter: drop-shadow(0 4px 10px rgb(0 0 0 / 0.14)); }
+.arch .node.hot .bx {
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 75%, transparent));
+}
+
+/* ── 16. scrollbars ─────────────────────────────────────────────────────────
+   Thin, rounded, and only visible while you are in the area. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-ink) 40%, transparent);
+  background-clip: content-box;
+}
+
+/* ── 17. motion, only where it means something ──────────────────────────────
+   Nothing animates on load. The department chart's beats are its own (see
+   department.js), and this only softens how panels appear. */
+@keyframes irina-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+#view > * { animation: irina-rise 0.28s var(--motion-ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  #view > * { animation: none; }
+}
