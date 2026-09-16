@@ -3,7 +3,7 @@
   <img src="docs/brand/waku-mark-on-light.svg" alt="Waku" width="76" align="right">
 </picture>
 
-# Irina-AI Powered Model Risk Management
+# Irina-AI Powered Model Risk Management Assistant
 
 > **Irina is under constant development.** The department runs end to end — delegation, scope and
 > depth are enforced in code — but the prompts in this README are tuned for demonstration. For
