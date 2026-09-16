@@ -138,7 +138,7 @@ path = "waku/__init__.py"
 
 [tool.hatch.build.targets.sdist]
 exclude = [
-    "docs", "examples", "lab", "scripts/whiteboard",
+    "docs", "examples", "lab", "scripts/whiteboard", "concentric", "Implementation",
     ".claude", ".deepeval", ".github",
 ]
 
