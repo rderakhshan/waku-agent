@@ -22,11 +22,6 @@ rather than in prompts.
 - **Watch it think.** A local dashboard draws the department and beats each seat as it works.
 - **Eval built in.** Deterministic tests *and* LLM-as-judge, side by side, with a release gate.
 
-![waku-agent architecture — the whiteboard](docs/architecture-whiteboard.png)
-
-> The system-design whiteboard.
-> Every box maps to a file — see [the architecture](docs/architecture.md).
-
 **[Waku Memory](https://www.waku.one)** — the same memory in Claude Code, Codex, Grok Bot and this agent: [waku.one](https://www.waku.one) · [docs](https://www.waku.one/docs)
 
 ## The department
