@@ -120,18 +120,10 @@ browser_agent.rebuild = rebuild
 
 
 def department_payload() -> dict:
-    """The department's topology and state, for the extra view. Angles come from
-    the roster, so the chart cannot drift from the graph."""
-    from concentric import roster
+    """Kept for callers that only want the topology; collect.py owns the real one."""
+    from concentric.collect import department_payload as build
 
-    seats = []
-    for spec in roster.SEATS:
-        seats.append({"role": spec.role, "title": spec.title, "ring": spec.ring,
-                      "parent": spec.parent, "angle": spec.arc_angle,
-                      "built": (seat_home(spec.role) / "state.db").exists()})
-    edges = [{"src": s.parent, "dst": s.role, "kind": "delegate"}
-             for s in roster.SEATS if s.parent]
-    return {"entry": IRINA, "seats": seats, "edges": edges}
+    return build()
 
 
 # Injected into waku's shell in memory. The file on disk is never touched, so
@@ -172,9 +164,10 @@ def _handler_class():
                            "text/html; charset=utf-8", no_cache=True)
                 return
             if path == "/api/data":
-                data = wd.collect()
-                data["department"] = department_payload()
-                self._send(json.dumps(data).encode("utf-8"), "application/json")
+                from concentric.collect import collect_department
+
+                self._send(json.dumps(collect_department()).encode("utf-8"),
+                           "application/json")
                 return
             super().do_GET()
 

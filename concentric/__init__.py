@@ -17,6 +17,10 @@ PROVIDER = "deepseek"
 MODEL = "deepseek-v4-pro"
 SMALL_MODEL = "deepseek-v4-flash"
 
+# The seat a run enters through. Its trace and its ledger already contain the
+# whole subtree, so they are the department's source of truth for activity.
+ENTRY = "irina"
+
 # Where the seats keep their own memory, prompts, traces and ledgers. The
 # `.waku-` prefix means .gitignore's `.waku-*/` rule already covers it.
 STATE_ROOT = Path(".waku-concentric/agents")
