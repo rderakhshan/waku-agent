@@ -290,6 +290,83 @@
   setInterval(poll, 1000);
   setInterval(paint, 300);
 
+  // ---- the panels are single-harness by design: they render waku's payload for
+  // ONE home. collect.py hands them the department's aggregate, but two things
+  // it adds have no home in those panels — the per-seat spend, and the seat each
+  // row belongs to. So wrap the views and append a section: the same
+  // "wrap, don't fork" move as Seat. waku's renderers are untouched.
+  const kb = (n) => `${(n / 1024).toFixed(1)} KB`;
+
+  function bySeatSpend(d) {
+    const u = d.usage || {};
+    const rows = u.by_seat || [];
+    if (!rows.length) return "";
+    const body = rows.map((b) => `<tr>
+        <td><code>${esc(b.seat)}</code></td>
+        <td class="meta">${b.calls}</td>
+        <td class="meta">${b.in.toLocaleString()}</td>
+        <td class="meta">${b.out.toLocaleString()}</td>
+        <td class="meta">${b.tool_calls}</td>
+        <td class="meta">${money(b.cost)}</td></tr>`).join("");
+    return `<h2>Spend by seat</h2>
+      <div class="meta" style="margin-bottom:var(--space-3)">${esc(u.note || "")}</div>
+      ${table(["seat", "LLM calls", "tokens in", "tokens out", "tool calls", "cost"], body)}`;
+  }
+
+  function memoryBySeat(d) {
+    const rows = (d.db && d.db.seats) || [];
+    if (!rows.length) return "";
+    const body = rows.map((r) => `<tr>
+        <td><code>${esc(r.seat)}</code></td>
+        <td class="meta">${r.facts || 0}</td>
+        <td class="meta">${r.episodes || 0}</td>
+        <td class="meta">${r.chat_log || 0}</td>
+        <td class="meta">${kb(r.size || 0)}</td></tr>`).join("");
+    return `<h2>Memory by seat</h2>
+      <div class="meta" style="margin-bottom:var(--space-3)">Each seat owns its own state.db.
+        The tables above are the union of all of them; this is who owns what.</div>
+      ${table(["seat", "facts", "episodes", "chat rows", "state.db"], body)}`;
+  }
+
+  function sessionsBySeat(d) {
+    const rows = d.sessions || [];
+    if (!rows.length) return "";
+    const body = rows.map((s) => `<tr>
+        <td><code>${esc(s.seat || "?")}</code></td>
+        <td class="meta">${esc(s.title || s.id || "")}</td>
+        <td class="meta">${s.messages || 0}</td>
+        <td class="meta">${esc(s.last_at || "")}</td></tr>`).join("");
+    return `<h2>Conversations by seat</h2>
+      <div class="meta" style="margin-bottom:var(--space-3)">Every seat keeps its own chat log.
+        The inbox above is the union; this is which seat each thread belongs to.</div>
+      ${table(["seat", "thread", "messages", "last"], body)}`;
+  }
+
+  function wrapView(name, extra) {
+    const base = VIEWS[name];
+    if (typeof base !== "function") return;
+    VIEWS[name] = (d, sub) => base(d, sub) + extra(d, sub);
+  }
+  wrapView("ops", bySeatSpend);
+  wrapView("memory", memoryBySeat);
+  wrapView("gateway", sessionsBySeat);
+
+  function seatsTable(dep) {
+    const rows = dep.seats.filter((s) => s.built || s.activity);
+    if (!rows.length) return "";
+    const body = rows.map((s) => {
+      const a = s.activity || {};
+      return `<tr>
+        <td><code>${esc(s.role)}</code></td>
+        <td class="meta">${s.ring}</td>
+        <td class="meta">${esc((s.tools || []).join(", "))}</td>
+        <td class="meta">${a.calls || 0}</td>
+        <td class="meta">${money(a.cost || 0)}</td></tr>`;
+    }).join("");
+    return `<h2>Seats that have run</h2>
+      ${table(["seat", "ring", "tools", "LLM calls", "cost"], body)}`;
+  }
+
   VIEWS.department = (d) => {
     const dep = d.department;
     const head = `<div class="meta" style="margin-bottom:var(--space-3)">Twenty-four seats, four
@@ -302,6 +379,7 @@
     setTimeout(paint, 0);   // re-apply beats after this render replaces the DOM
     return head + departmentSVG(dep) + legend()
       + uiCard(`<div class="meta">${built} of ${dep.seats.length} seats have run &middot;
-        ${dep.edges.length} spokes. Grey = never used.</div>`);
+        ${dep.edges.length} spokes. Grey = never used.</div>`)
+      + seatsTable(dep);
   };
 })();
