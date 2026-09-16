@@ -21,6 +21,7 @@ lives here and not in browser_agent.py: waku must not learn about the department
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -126,18 +127,31 @@ def department_payload() -> dict:
     return build()
 
 
-# Injected into waku's shell in memory. The file on disk is never touched, so
+# Injected into waku's shell in memory. The files on disk are never touched, so
 # the stock dashboard (7777) and the tests that guard it are unaffected.
 _RAIL = ('<div class="r-grp">Department</div>\n'
          '<a href="#department" data-v="department" data-short="D" '
          'aria-label="Department"><span class="lbl">Department</span></a>\n')
 _SCRIPT = '<script src="/department.js"></script>\n'
+# The sidebar mark is a CSS mask pointing at waku's svg, so the URL lives in
+# style.css and cannot be swapped by editing markup. A later stylesheet wins at
+# equal specificity, so one rule at the end of <head> repoints it.
+_BRAND = ('<style>\n'
+          '.r-top .mark{-webkit-mask:url(/irina-mark.svg) center/contain no-repeat;'
+          'mask:url(/irina-mark.svg) center/contain no-repeat}\n'
+          '</style>\n')
 
 
 def _inject(html: str) -> str:
-    """One rail item, one script. Both are additive; nothing is removed."""
+    """Rename the shell to Irina and point it at her mark. Additive and
+    in-memory; waku's index.html is never written."""
+    html = re.sub(r"<title>.*?</title>", "<title>Irina</title>", html, count=1)
+    html = html.replace('href="/static/waku-mark.svg"', 'href="/irina-mark.svg"', 1)
+    html = html.replace('<span class="r-name">WAKU</span>',
+                        '<span class="r-name">IRINA</span>', 1)
     html = html.replace('<div class="r-grp">System</div>',
                         _RAIL + '<div class="r-grp">System</div>', 1)
+    html = html.replace("</head>", _BRAND + "</head>", 1)
     return html.replace('<script src="/static/js/main.js"></script>',
                         _SCRIPT + '<script src="/static/js/main.js"></script>', 1)
 
@@ -157,6 +171,10 @@ def _handler_class():
             if path == "/department.js":
                 body = (Path(__file__).parent / "static" / "department.js").read_bytes()
                 self._send(body, "text/javascript", no_cache=True)
+                return
+            if path == "/irina-mark.svg":
+                body = (Path(__file__).parent / "static" / "irina-mark.svg").read_bytes()
+                self._send(body, "image/svg+xml", no_cache=True)
                 return
             if path == "/":
                 html = (wd.STATIC / "index.html").read_text(encoding="utf-8")
