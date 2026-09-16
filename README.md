@@ -43,6 +43,27 @@ Every seat runs on DeepSeek by default. Put `DEEPSEEK_API_KEY` in `.env`. The de
 [Implementation/PLAN-waku-blocks.md](Implementation/PLAN-waku-blocks.md), and `waku/` itself is
 unchanged — the department only adds to it.
 
+### Try this
+
+Paste it at the `you >` prompt, or into the chat dock on the dashboard:
+
+```
+Have CFO-1, CFO-2 and CFO-3 look at the IFRS 9 data together. The Data Steward
+says where the data comes from, the Data-Quality Reviewer says what is unfit, and
+the Policy Analyst says what the ECB requires of us. Have the three CFOs compare
+notes with each other and come back with one plan.
+```
+
+Irina delegates to three CFOs; each one tasks the named worker in its team; the CFOs consult each
+other where their answers overlap; and the answer comes back up as a single plan. In the
+dashboard you can watch it: the spokes light as each seat is tasked, and the faint chords between
+CFOs turn solid when they compare notes.
+
+> **Irina is under constant development.** The department runs end to end — delegation, scope and
+> depth are enforced in code — but these prompts are tuned for demonstration. For real use cases,
+> expect to tune both sides: the role mandates in `concentric/roster.py` (a seat's mandate is what
+> it thinks it may do) and how you phrase the task. A vague ask gets a vague delegation.
+
 ## Quickstart
 
 Just want to run it:
