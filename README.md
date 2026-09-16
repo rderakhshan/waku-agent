@@ -3,34 +3,50 @@
   <img src="docs/brand/waku-mark-on-light.svg" alt="Waku" width="76" align="right">
 </picture>
 
-# waku-agent
+# Irina-AI Powered Model Risk Management
 
-**Your own AI assistant. On your laptop. In code you can read in an afternoon.**
+**A department of AI agents for model risk management, in code you can read.**
 
-Meet **Waku** — a local-first personal assistant that shows the four pillars behind every
-serious agent: **Harness · Loop · Memory · Eval/LLM-Ops**. No frameworks hiding the good parts.
-Built by [seanchen.io](https://seanchen.io).
+Irina is built on **[waku-agent](https://github.com/ShenSeanChen/waku-agent)** — a local-first
+personal assistant that shows the four pillars behind every serious agent:
+**Harness · Loop · Memory · Eval/LLM-Ops**, with no framework hiding the good parts.
 
-- **Local-first.** Your memory is one SQLite file. Open it. Read it. It's yours.
-- **Memory is the hero.** Semantic + episodic + procedural — with a gate that decides *whether*
-  to remember, and a pass that decides *what* to keep.
-- **The loop is ~95 lines** of plain Python. Step through it.
-- **Watch it think.** A local dashboard lights up every message as it flows through the harness.
+This fork adds **`concentric/`**: a 24-seat department — one chief model risk officer, four
+CFOs and nineteen workers — assembled from waku's own building blocks. Each seat is a full waku
+agent with its own memory, prompt and tool registry, and the graph's rules are enforced in code
+rather than in prompts.
+
+- **The graph is code.** Scope is the delegation tool's role enum, depth is a ring counter, and
+  a worker is given no delegation tool at all — the forbidden edges are absent, not refused.
+- **Local-first.** Every seat keeps its own SQLite file. Open it. Read it. It's yours.
+- **Watch it think.** A local dashboard draws the department and beats each seat as it works.
 - **Eval built in.** Deterministic tests *and* LLM-as-judge, side by side, with a release gate.
 
 ![waku-agent architecture — the whiteboard](docs/architecture-whiteboard.png)
 
-> The system-design whiteboard from the series.
+> The system-design whiteboard.
 > Every box maps to a file — see [the architecture](docs/architecture.md).
-
-**▶ [Watch the 20-min code walkthrough](https://www.youtube.com/watch?v=rvRyBhILrls&list=PLE9hy4A7ZTmpGq7GHf5tgGFWh2277AeDR&index=42)** — the loop, the memory pillars, the evals, the Telegram gateway and the "Waku Waku" wake word, live.
 
 **[Waku Memory](https://www.waku.one)** — the same memory in Claude Code, Codex, Grok Bot and this agent: [waku.one](https://www.waku.one) · [docs](https://www.waku.one/docs)
 
-[YouTube](https://www.youtube.com/@SeanAIStories) · [X](https://x.com/ShenSeanChen) · [LinkedIn](https://linkedin.com/in/shen-sean-chen) · [Instagram](https://www.instagram.com/sean_ai_stories) · [TikTok](https://www.tiktok.com/@sean_ai_stories) · [Discord](https://discord.gg/ebbdvSCXqu) ·
-[哔哩哔哩](https://space.bilibili.com/479332937) · [小红书](https://www.xiaohongshu.com/user/profile/5cf02cfb0000000005014371) · [抖音](https://www.douyin.com/user/MS4wLjABAAAAWCkd62_e8q4n-S34LIL04HsYN3m03l8MFdVYZToojP8)
+## The department
 
-### [Buy me a coffee](https://buy.stripe.com/5kA176bA895ggog4gh) — it keeps this repo (and the videos) coming
+```
+ring 0   Irina          the chief model risk officer
+ring 1   4 CFOs         development · validation · governance · audit
+ring 2   19 workers     five (or four) to a team, on waku's building blocks
+```
+
+```bash
+uv run python -m concentric                  # talk to Irina in the terminal
+uv run python -m concentric "tier the IFRS 9 model"
+uv run python -m concentric.dashboard        # the department in the browser → localhost:7778
+uv run python -m concentric.demo             # offline proof, no API key, no spend
+```
+
+Every seat runs on DeepSeek by default. Put `DEEPSEEK_API_KEY` in `.env`. The design is in
+[Implementation/PLAN-waku-blocks.md](Implementation/PLAN-waku-blocks.md), and `waku/` itself is
+unchanged — the department only adds to it.
 
 ## Quickstart
 
@@ -104,26 +120,10 @@ read and change. Versus the big open-source assistants (OpenClaw, Hermes)? Same 
 | [Commands](docs/commands.md) | every `waku` and `make` command |
 | [Evals & tracing](docs/evals.md) | the two kinds of eval, the release gate, traces and spend |
 | [Roadmap](docs/roadmap.md) | what is live, what is still a skeleton, upgrade paths |
-| [Whiteboards](docs/README.md#whiteboards) | the editable system-design charts from the videos |
-| [lab/](lab/README.md) | Waku meets other agents and models: the video experiments |
+| [Whiteboards](docs/README.md#whiteboards) | the editable system-design charts |
+| [lab/](lab/README.md) | Waku meets other agents and models: the experiments |
 | [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) | the rules, and how to send a PR |
 
-## Community
-
-Star the repo, join the [Discord](https://discord.gg/ebbdvSCXqu), and grab a
-[good first issue](https://github.com/ShenSeanChen/waku-agent/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-— that link is the live list, so it's always current. Gateways, memory backends and
-community skills are all shaped to be first PRs; the easiest needs no Python at all
-(see [contributing a skill](CONTRIBUTING.md)).
-
-**Comment on an issue before you start** and it gets assigned to you, so two people
-never build the same thing.
-
-## Also from me
-
-- **[launch-mvp-stripe-nextjs-supabase](https://github.com/ShenSeanChen/launch-mvp-stripe-nextjs-supabase)** — NextJS + Supabase + Stripe, everything you need to ship a SaaS.
-- **[AutoManus.io](https://automanus.io)** — my AI startup: a sales lead manager for made-to-order products. It embeds where conversations already happen (WhatsApp, email, web chat) to capture inbound, automate follow-ups and kill CRM busywork. Pre-seed backed by Character VC. ([AutoManus Discord](https://discord.gg/SxXATg9rSK))
-
 Code is MIT — see [LICENSE](LICENSE). The Waku name, mark and design system belong to
-AutoManus Technologies, Inc. and are not MIT — see [LICENSE-BRAND](LICENSE-BRAND). Built by [@ShenSeanChen](https://github.com/ShenSeanChen)
-([YouTube](https://www.youtube.com/@SeanAIStories) · [X](https://x.com/ShenSeanChen)).
+AutoManus Technologies, Inc. and are not MIT — see [LICENSE-BRAND](LICENSE-BRAND). Built by
+[@ShenSeanChen](https://github.com/ShenSeanChen).
