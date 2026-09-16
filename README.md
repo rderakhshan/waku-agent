@@ -32,11 +32,7 @@ rather than in prompts.
 
 ## The department
 
-```
-ring 0   Irina          the chief model risk officer
-ring 1   4 CFOs         development · validation · governance · audit
-ring 2   19 workers     five (or four) to a team, on waku's building blocks
-```
+![Irina's department — Irina, four CFOs, nineteen workers](docs/department.svg)
 
 ```bash
 uv run python -m concentric                  # talk to Irina in the terminal
