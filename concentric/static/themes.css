@@ -1,0 +1,1703 @@
+/* Irina's dashboard — the theme layer. GENERATED, do not edit by hand.
+ *
+ * Source: the opencode palettes vendored by Irina's CLI
+ * (irina/cli/themes/*.json). Regenerate with:
+ *
+ *     python -m concentric.make_themes <path to irina/cli/themes>
+ *
+ * Each block maps Irina's semantic tokens onto the tokens waku's
+ * dashboard reads. Colour only — layout, spacing and motion live in
+ * ui.css, and the default (no data-irina-theme) is waku's own palette.
+ */
+
+[data-irina-theme="aura"] {
+  --surface-bg: #0f0f0f;
+  --surface-paper: #15141b;
+  --surface-raised: #15141b;
+  --text-ink: #edecee;
+  --text-muted: #6d6d6d;
+  --rule: #2d2d2d;
+  --rule-hard: #6d6d6d;
+  --accent: #a277ff;
+  --accent-fg: #a277ff;
+  --ok: #61ffca;
+  --warn: #ffca85;
+  --bad: #ff6767;
+  --surface-sunk: color-mix(in srgb, #edecee 12%, #0f0f0f);
+  --text-faint: color-mix(in srgb, #edecee 62%, #0f0f0f);
+  --scrollbar-thumb: color-mix(in srgb, #edecee 25%, transparent);
+  --accent-ink: #0f0f0f;
+  --accent-hover: color-mix(in srgb, #a277ff 88%, #edecee);
+  --accent-active: color-mix(in srgb, #a277ff 78%, #edecee);
+  --chart-1: #a277ff;
+  --chart-2: color-mix(in srgb, #a277ff 78%, #0f0f0f);
+  --chart-3: color-mix(in srgb, #a277ff 58%, #0f0f0f);
+  --chart-4: color-mix(in srgb, #a277ff 40%, #0f0f0f);
+  --chart-5: color-mix(in srgb, #a277ff 24%, #0f0f0f);
+}
+
+[data-theme="light"][data-irina-theme="aura"] {
+  --surface-bg: #0f0f0f;
+  --surface-paper: #15141b;
+  --surface-raised: #15141b;
+  --text-ink: #edecee;
+  --text-muted: #6d6d6d;
+  --rule: #2d2d2d;
+  --rule-hard: #6d6d6d;
+  --accent: #a277ff;
+  --accent-fg: #a277ff;
+  --ok: #61ffca;
+  --warn: #ffca85;
+  --bad: #ff6767;
+  --surface-sunk: color-mix(in srgb, #edecee 12%, #0f0f0f);
+  --text-faint: color-mix(in srgb, #edecee 62%, #0f0f0f);
+  --scrollbar-thumb: color-mix(in srgb, #edecee 25%, transparent);
+  --accent-ink: #0f0f0f;
+  --accent-hover: color-mix(in srgb, #a277ff 88%, #edecee);
+  --accent-active: color-mix(in srgb, #a277ff 78%, #edecee);
+  --chart-1: #a277ff;
+  --chart-2: color-mix(in srgb, #a277ff 78%, #0f0f0f);
+  --chart-3: color-mix(in srgb, #a277ff 58%, #0f0f0f);
+  --chart-4: color-mix(in srgb, #a277ff 40%, #0f0f0f);
+  --chart-5: color-mix(in srgb, #a277ff 24%, #0f0f0f);
+}
+
+[data-irina-theme="ayu"] {
+  --surface-bg: #0b0e14;
+  --surface-paper: #0f131a;
+  --surface-raised: #0d1017;
+  --text-ink: #bfbdb6;
+  --text-muted: #565b66;
+  --rule: #6c7380;
+  --rule-hard: #6c7380;
+  --accent: #59c2ff;
+  --accent-fg: #59c2ff;
+  --ok: #7fd962;
+  --warn: #e6b673;
+  --bad: #d95757;
+  --surface-sunk: color-mix(in srgb, #bfbdb6 12%, #0b0e14);
+  --text-faint: color-mix(in srgb, #bfbdb6 62%, #0b0e14);
+  --scrollbar-thumb: color-mix(in srgb, #bfbdb6 25%, transparent);
+  --accent-ink: #0b0e14;
+  --accent-hover: color-mix(in srgb, #59c2ff 88%, #bfbdb6);
+  --accent-active: color-mix(in srgb, #59c2ff 78%, #bfbdb6);
+  --chart-1: #59c2ff;
+  --chart-2: color-mix(in srgb, #59c2ff 78%, #0b0e14);
+  --chart-3: color-mix(in srgb, #59c2ff 58%, #0b0e14);
+  --chart-4: color-mix(in srgb, #59c2ff 40%, #0b0e14);
+  --chart-5: color-mix(in srgb, #59c2ff 24%, #0b0e14);
+}
+
+[data-theme="light"][data-irina-theme="ayu"] {
+  --surface-bg: #0b0e14;
+  --surface-paper: #0f131a;
+  --surface-raised: #0d1017;
+  --text-ink: #bfbdb6;
+  --text-muted: #565b66;
+  --rule: #6c7380;
+  --rule-hard: #6c7380;
+  --accent: #59c2ff;
+  --accent-fg: #59c2ff;
+  --ok: #7fd962;
+  --warn: #e6b673;
+  --bad: #d95757;
+  --surface-sunk: color-mix(in srgb, #bfbdb6 12%, #0b0e14);
+  --text-faint: color-mix(in srgb, #bfbdb6 62%, #0b0e14);
+  --scrollbar-thumb: color-mix(in srgb, #bfbdb6 25%, transparent);
+  --accent-ink: #0b0e14;
+  --accent-hover: color-mix(in srgb, #59c2ff 88%, #bfbdb6);
+  --accent-active: color-mix(in srgb, #59c2ff 78%, #bfbdb6);
+  --chart-1: #59c2ff;
+  --chart-2: color-mix(in srgb, #59c2ff 78%, #0b0e14);
+  --chart-3: color-mix(in srgb, #59c2ff 58%, #0b0e14);
+  --chart-4: color-mix(in srgb, #59c2ff 40%, #0b0e14);
+  --chart-5: color-mix(in srgb, #59c2ff 24%, #0b0e14);
+}
+
+[data-irina-theme="carbonfox"] {
+  --surface-bg: #161616;
+  --surface-paper: #1a1a1a;
+  --surface-raised: #1e1e1e;
+  --text-ink: #f2f4f8;
+  --text-muted: #7d848f;
+  --rule: #303030;
+  --rule-hard: #33b1ff;
+  --accent: #33b1ff;
+  --accent-fg: #33b1ff;
+  --ok: #25be6a;
+  --warn: #f1c21b;
+  --bad: #ee5396;
+  --surface-sunk: color-mix(in srgb, #f2f4f8 12%, #161616);
+  --text-faint: color-mix(in srgb, #f2f4f8 62%, #161616);
+  --scrollbar-thumb: color-mix(in srgb, #f2f4f8 25%, transparent);
+  --accent-ink: #161616;
+  --accent-hover: color-mix(in srgb, #33b1ff 88%, #f2f4f8);
+  --accent-active: color-mix(in srgb, #33b1ff 78%, #f2f4f8);
+  --chart-1: #33b1ff;
+  --chart-2: color-mix(in srgb, #33b1ff 78%, #161616);
+  --chart-3: color-mix(in srgb, #33b1ff 58%, #161616);
+  --chart-4: color-mix(in srgb, #33b1ff 40%, #161616);
+  --chart-5: color-mix(in srgb, #33b1ff 24%, #161616);
+}
+
+[data-theme="light"][data-irina-theme="carbonfox"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #f4f4f4;
+  --surface-raised: #f4f4f4;
+  --text-ink: #161616;
+  --text-muted: #6f6f6f;
+  --rule: #dcdcdc;
+  --rule-hard: #0043ce;
+  --accent: #0043ce;
+  --accent-fg: #0043ce;
+  --ok: #198038;
+  --warn: #007d79;
+  --bad: #9f1853;
+  --surface-sunk: color-mix(in srgb, #161616 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #161616 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #161616 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #0043ce 88%, #161616);
+  --accent-active: color-mix(in srgb, #0043ce 78%, #161616);
+  --chart-1: #0043ce;
+  --chart-2: color-mix(in srgb, #0043ce 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #0043ce 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #0043ce 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #0043ce 24%, #ffffff);
+}
+
+[data-irina-theme="catppuccin-frappe"] {
+  --surface-bg: #303446;
+  --surface-paper: #292c3c;
+  --surface-raised: #232634;
+  --text-ink: #c6d0f5;
+  --text-muted: #949cb8;
+  --rule: #414559;
+  --rule-hard: #51576d;
+  --accent: #8da4e2;
+  --accent-fg: #8da4e2;
+  --ok: #a6d189;
+  --warn: #e5c890;
+  --bad: #e78284;
+  --surface-sunk: color-mix(in srgb, #c6d0f5 12%, #303446);
+  --text-faint: color-mix(in srgb, #c6d0f5 62%, #303446);
+  --scrollbar-thumb: color-mix(in srgb, #c6d0f5 25%, transparent);
+  --accent-ink: #303446;
+  --accent-hover: color-mix(in srgb, #8da4e2 88%, #c6d0f5);
+  --accent-active: color-mix(in srgb, #8da4e2 78%, #c6d0f5);
+  --chart-1: #8da4e2;
+  --chart-2: color-mix(in srgb, #8da4e2 78%, #303446);
+  --chart-3: color-mix(in srgb, #8da4e2 58%, #303446);
+  --chart-4: color-mix(in srgb, #8da4e2 40%, #303446);
+  --chart-5: color-mix(in srgb, #8da4e2 24%, #303446);
+}
+
+[data-theme="light"][data-irina-theme="catppuccin-frappe"] {
+  --surface-bg: #303446;
+  --surface-paper: #292c3c;
+  --surface-raised: #232634;
+  --text-ink: #c6d0f5;
+  --text-muted: #949cb8;
+  --rule: #414559;
+  --rule-hard: #51576d;
+  --accent: #8da4e2;
+  --accent-fg: #8da4e2;
+  --ok: #a6d189;
+  --warn: #e5c890;
+  --bad: #e78284;
+  --surface-sunk: color-mix(in srgb, #c6d0f5 12%, #303446);
+  --text-faint: color-mix(in srgb, #c6d0f5 62%, #303446);
+  --scrollbar-thumb: color-mix(in srgb, #c6d0f5 25%, transparent);
+  --accent-ink: #303446;
+  --accent-hover: color-mix(in srgb, #8da4e2 88%, #c6d0f5);
+  --accent-active: color-mix(in srgb, #8da4e2 78%, #c6d0f5);
+  --chart-1: #8da4e2;
+  --chart-2: color-mix(in srgb, #8da4e2 78%, #303446);
+  --chart-3: color-mix(in srgb, #8da4e2 58%, #303446);
+  --chart-4: color-mix(in srgb, #8da4e2 40%, #303446);
+  --chart-5: color-mix(in srgb, #8da4e2 24%, #303446);
+}
+
+[data-irina-theme="catppuccin-macchiato"] {
+  --surface-bg: #24273a;
+  --surface-paper: #1e2030;
+  --surface-raised: #181926;
+  --text-ink: #cad3f5;
+  --text-muted: #939ab7;
+  --rule: #363a4f;
+  --rule-hard: #494d64;
+  --accent: #8aadf4;
+  --accent-fg: #8aadf4;
+  --ok: #a6da95;
+  --warn: #eed49f;
+  --bad: #ed8796;
+  --surface-sunk: color-mix(in srgb, #cad3f5 12%, #24273a);
+  --text-faint: color-mix(in srgb, #cad3f5 62%, #24273a);
+  --scrollbar-thumb: color-mix(in srgb, #cad3f5 25%, transparent);
+  --accent-ink: #24273a;
+  --accent-hover: color-mix(in srgb, #8aadf4 88%, #cad3f5);
+  --accent-active: color-mix(in srgb, #8aadf4 78%, #cad3f5);
+  --chart-1: #8aadf4;
+  --chart-2: color-mix(in srgb, #8aadf4 78%, #24273a);
+  --chart-3: color-mix(in srgb, #8aadf4 58%, #24273a);
+  --chart-4: color-mix(in srgb, #8aadf4 40%, #24273a);
+  --chart-5: color-mix(in srgb, #8aadf4 24%, #24273a);
+}
+
+[data-theme="light"][data-irina-theme="catppuccin-macchiato"] {
+  --surface-bg: #24273a;
+  --surface-paper: #1e2030;
+  --surface-raised: #181926;
+  --text-ink: #cad3f5;
+  --text-muted: #939ab7;
+  --rule: #363a4f;
+  --rule-hard: #494d64;
+  --accent: #8aadf4;
+  --accent-fg: #8aadf4;
+  --ok: #a6da95;
+  --warn: #eed49f;
+  --bad: #ed8796;
+  --surface-sunk: color-mix(in srgb, #cad3f5 12%, #24273a);
+  --text-faint: color-mix(in srgb, #cad3f5 62%, #24273a);
+  --scrollbar-thumb: color-mix(in srgb, #cad3f5 25%, transparent);
+  --accent-ink: #24273a;
+  --accent-hover: color-mix(in srgb, #8aadf4 88%, #cad3f5);
+  --accent-active: color-mix(in srgb, #8aadf4 78%, #cad3f5);
+  --chart-1: #8aadf4;
+  --chart-2: color-mix(in srgb, #8aadf4 78%, #24273a);
+  --chart-3: color-mix(in srgb, #8aadf4 58%, #24273a);
+  --chart-4: color-mix(in srgb, #8aadf4 40%, #24273a);
+  --chart-5: color-mix(in srgb, #8aadf4 24%, #24273a);
+}
+
+[data-irina-theme="catppuccin"] {
+  --surface-bg: #1e1e2e;
+  --surface-paper: #181825;
+  --surface-raised: #11111b;
+  --text-ink: #cdd6f4;
+  --text-muted: #9399b2;
+  --rule: #313244;
+  --rule-hard: #45475a;
+  --accent: #89b4fa;
+  --accent-fg: #89b4fa;
+  --ok: #a6e3a1;
+  --warn: #f9e2af;
+  --bad: #f38ba8;
+  --surface-sunk: color-mix(in srgb, #cdd6f4 12%, #1e1e2e);
+  --text-faint: color-mix(in srgb, #cdd6f4 62%, #1e1e2e);
+  --scrollbar-thumb: color-mix(in srgb, #cdd6f4 25%, transparent);
+  --accent-ink: #1e1e2e;
+  --accent-hover: color-mix(in srgb, #89b4fa 88%, #cdd6f4);
+  --accent-active: color-mix(in srgb, #89b4fa 78%, #cdd6f4);
+  --chart-1: #89b4fa;
+  --chart-2: color-mix(in srgb, #89b4fa 78%, #1e1e2e);
+  --chart-3: color-mix(in srgb, #89b4fa 58%, #1e1e2e);
+  --chart-4: color-mix(in srgb, #89b4fa 40%, #1e1e2e);
+  --chart-5: color-mix(in srgb, #89b4fa 24%, #1e1e2e);
+}
+
+[data-theme="light"][data-irina-theme="catppuccin"] {
+  --surface-bg: #eff1f5;
+  --surface-paper: #e6e9ef;
+  --surface-raised: #dce0e8;
+  --text-ink: #4c4f69;
+  --text-muted: #7c7f93;
+  --rule: #ccd0da;
+  --rule-hard: #bcc0cc;
+  --accent: #1e66f5;
+  --accent-fg: #1e66f5;
+  --ok: #40a02b;
+  --warn: #df8e1d;
+  --bad: #d20f39;
+  --surface-sunk: color-mix(in srgb, #4c4f69 12%, #eff1f5);
+  --text-faint: color-mix(in srgb, #4c4f69 62%, #eff1f5);
+  --scrollbar-thumb: color-mix(in srgb, #4c4f69 25%, transparent);
+  --accent-ink: #eff1f5;
+  --accent-hover: color-mix(in srgb, #1e66f5 88%, #4c4f69);
+  --accent-active: color-mix(in srgb, #1e66f5 78%, #4c4f69);
+  --chart-1: #1e66f5;
+  --chart-2: color-mix(in srgb, #1e66f5 78%, #eff1f5);
+  --chart-3: color-mix(in srgb, #1e66f5 58%, #eff1f5);
+  --chart-4: color-mix(in srgb, #1e66f5 40%, #eff1f5);
+  --chart-5: color-mix(in srgb, #1e66f5 24%, #eff1f5);
+}
+
+[data-irina-theme="cobalt2"] {
+  --surface-bg: #193549;
+  --surface-paper: #122738;
+  --surface-raised: #1f4662;
+  --text-ink: #ffffff;
+  --text-muted: #adb7c9;
+  --rule: #1f4662;
+  --rule-hard: #0088ff;
+  --accent: #0088ff;
+  --accent-fg: #0088ff;
+  --ok: #9eff80;
+  --warn: #ffc600;
+  --bad: #ff0088;
+  --surface-sunk: color-mix(in srgb, #ffffff 12%, #193549);
+  --text-faint: color-mix(in srgb, #ffffff 62%, #193549);
+  --scrollbar-thumb: color-mix(in srgb, #ffffff 25%, transparent);
+  --accent-ink: #193549;
+  --accent-hover: color-mix(in srgb, #0088ff 88%, #ffffff);
+  --accent-active: color-mix(in srgb, #0088ff 78%, #ffffff);
+  --chart-1: #0088ff;
+  --chart-2: color-mix(in srgb, #0088ff 78%, #193549);
+  --chart-3: color-mix(in srgb, #0088ff 58%, #193549);
+  --chart-4: color-mix(in srgb, #0088ff 40%, #193549);
+  --chart-5: color-mix(in srgb, #0088ff 24%, #193549);
+}
+
+[data-theme="light"][data-irina-theme="cobalt2"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #f5f7fa;
+  --surface-raised: #e8ecf1;
+  --text-ink: #193549;
+  --text-muted: #5c6b7d;
+  --rule: #d3dae3;
+  --rule-hard: #0066cc;
+  --accent: #0066cc;
+  --accent-fg: #0066cc;
+  --ok: #4caf50;
+  --warn: #ff9800;
+  --bad: #e91e63;
+  --surface-sunk: color-mix(in srgb, #193549 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #193549 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #193549 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #0066cc 88%, #193549);
+  --accent-active: color-mix(in srgb, #0066cc 78%, #193549);
+  --chart-1: #0066cc;
+  --chart-2: color-mix(in srgb, #0066cc 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #0066cc 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #0066cc 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #0066cc 24%, #ffffff);
+}
+
+[data-irina-theme="cursor"] {
+  --surface-bg: #181818;
+  --surface-paper: #141414;
+  --surface-raised: #262626;
+  --text-ink: #e4e4e4;
+  --text-muted: #e4e4e4;
+  --rule: #e4e4e4;
+  --rule-hard: #88c0d0;
+  --accent: #88c0d0;
+  --accent-fg: #88c0d0;
+  --ok: #3fa266;
+  --warn: #f1b467;
+  --bad: #e34671;
+  --surface-sunk: color-mix(in srgb, #e4e4e4 12%, #181818);
+  --text-faint: color-mix(in srgb, #e4e4e4 62%, #181818);
+  --scrollbar-thumb: color-mix(in srgb, #e4e4e4 25%, transparent);
+  --accent-ink: #181818;
+  --accent-hover: color-mix(in srgb, #88c0d0 88%, #e4e4e4);
+  --accent-active: color-mix(in srgb, #88c0d0 78%, #e4e4e4);
+  --chart-1: #88c0d0;
+  --chart-2: color-mix(in srgb, #88c0d0 78%, #181818);
+  --chart-3: color-mix(in srgb, #88c0d0 58%, #181818);
+  --chart-4: color-mix(in srgb, #88c0d0 40%, #181818);
+  --chart-5: color-mix(in srgb, #88c0d0 24%, #181818);
+}
+
+[data-theme="light"][data-irina-theme="cursor"] {
+  --surface-bg: #fcfcfc;
+  --surface-paper: #f3f3f3;
+  --surface-raised: #ededed;
+  --text-ink: #141414;
+  --text-muted: #141414;
+  --rule: #141414;
+  --rule-hard: #6f9ba6;
+  --accent: #6f9ba6;
+  --accent-fg: #6f9ba6;
+  --ok: #1f8a65;
+  --warn: #db704b;
+  --bad: #cf2d56;
+  --surface-sunk: color-mix(in srgb, #141414 12%, #fcfcfc);
+  --text-faint: color-mix(in srgb, #141414 62%, #fcfcfc);
+  --scrollbar-thumb: color-mix(in srgb, #141414 25%, transparent);
+  --accent-ink: #fcfcfc;
+  --accent-hover: color-mix(in srgb, #6f9ba6 88%, #141414);
+  --accent-active: color-mix(in srgb, #6f9ba6 78%, #141414);
+  --chart-1: #6f9ba6;
+  --chart-2: color-mix(in srgb, #6f9ba6 78%, #fcfcfc);
+  --chart-3: color-mix(in srgb, #6f9ba6 58%, #fcfcfc);
+  --chart-4: color-mix(in srgb, #6f9ba6 40%, #fcfcfc);
+  --chart-5: color-mix(in srgb, #6f9ba6 24%, #fcfcfc);
+}
+
+[data-irina-theme="dracula"] {
+  --surface-bg: #282a36;
+  --surface-paper: #21222c;
+  --surface-raised: #44475a;
+  --text-ink: #f8f8f2;
+  --text-muted: #6272a4;
+  --rule: #44475a;
+  --rule-hard: #bd93f9;
+  --accent: #bd93f9;
+  --accent-fg: #bd93f9;
+  --ok: #50fa7b;
+  --warn: #f1fa8c;
+  --bad: #ff5555;
+  --surface-sunk: color-mix(in srgb, #f8f8f2 12%, #282a36);
+  --text-faint: color-mix(in srgb, #f8f8f2 62%, #282a36);
+  --scrollbar-thumb: color-mix(in srgb, #f8f8f2 25%, transparent);
+  --accent-ink: #282a36;
+  --accent-hover: color-mix(in srgb, #bd93f9 88%, #f8f8f2);
+  --accent-active: color-mix(in srgb, #bd93f9 78%, #f8f8f2);
+  --chart-1: #bd93f9;
+  --chart-2: color-mix(in srgb, #bd93f9 78%, #282a36);
+  --chart-3: color-mix(in srgb, #bd93f9 58%, #282a36);
+  --chart-4: color-mix(in srgb, #bd93f9 40%, #282a36);
+  --chart-5: color-mix(in srgb, #bd93f9 24%, #282a36);
+}
+
+[data-theme="light"][data-irina-theme="dracula"] {
+  --surface-bg: #f8f8f2;
+  --surface-paper: #e8e8e2;
+  --surface-raised: #d8d8d2;
+  --text-ink: #282a36;
+  --text-muted: #6272a4;
+  --rule: #c8c8c2;
+  --rule-hard: #bd93f9;
+  --accent: #bd93f9;
+  --accent-fg: #bd93f9;
+  --ok: #50fa7b;
+  --warn: #f1fa8c;
+  --bad: #ff5555;
+  --surface-sunk: color-mix(in srgb, #282a36 12%, #f8f8f2);
+  --text-faint: color-mix(in srgb, #282a36 62%, #f8f8f2);
+  --scrollbar-thumb: color-mix(in srgb, #282a36 25%, transparent);
+  --accent-ink: #f8f8f2;
+  --accent-hover: color-mix(in srgb, #bd93f9 88%, #282a36);
+  --accent-active: color-mix(in srgb, #bd93f9 78%, #282a36);
+  --chart-1: #bd93f9;
+  --chart-2: color-mix(in srgb, #bd93f9 78%, #f8f8f2);
+  --chart-3: color-mix(in srgb, #bd93f9 58%, #f8f8f2);
+  --chart-4: color-mix(in srgb, #bd93f9 40%, #f8f8f2);
+  --chart-5: color-mix(in srgb, #bd93f9 24%, #f8f8f2);
+}
+
+[data-irina-theme="everforest"] {
+  --surface-bg: #2d353b;
+  --surface-paper: #333c43;
+  --surface-raised: #343f44;
+  --text-ink: #d3c6aa;
+  --text-muted: #7a8478;
+  --rule: #859289;
+  --rule-hard: #9da9a0;
+  --accent: #a7c080;
+  --accent-fg: #a7c080;
+  --ok: #a7c080;
+  --warn: #e69875;
+  --bad: #e67e80;
+  --surface-sunk: color-mix(in srgb, #d3c6aa 12%, #2d353b);
+  --text-faint: color-mix(in srgb, #d3c6aa 62%, #2d353b);
+  --scrollbar-thumb: color-mix(in srgb, #d3c6aa 25%, transparent);
+  --accent-ink: #2d353b;
+  --accent-hover: color-mix(in srgb, #a7c080 88%, #d3c6aa);
+  --accent-active: color-mix(in srgb, #a7c080 78%, #d3c6aa);
+  --chart-1: #a7c080;
+  --chart-2: color-mix(in srgb, #a7c080 78%, #2d353b);
+  --chart-3: color-mix(in srgb, #a7c080 58%, #2d353b);
+  --chart-4: color-mix(in srgb, #a7c080 40%, #2d353b);
+  --chart-5: color-mix(in srgb, #a7c080 24%, #2d353b);
+}
+
+[data-theme="light"][data-irina-theme="everforest"] {
+  --surface-bg: #fdf6e3;
+  --surface-paper: #efebd4;
+  --surface-raised: #f4f0d9;
+  --text-ink: #5c6a72;
+  --text-muted: #a6b0a0;
+  --rule: #939f91;
+  --rule-hard: #829181;
+  --accent: #8da101;
+  --accent-fg: #8da101;
+  --ok: #8da101;
+  --warn: #f57d26;
+  --bad: #f85552;
+  --surface-sunk: color-mix(in srgb, #5c6a72 12%, #fdf6e3);
+  --text-faint: color-mix(in srgb, #5c6a72 62%, #fdf6e3);
+  --scrollbar-thumb: color-mix(in srgb, #5c6a72 25%, transparent);
+  --accent-ink: #fdf6e3;
+  --accent-hover: color-mix(in srgb, #8da101 88%, #5c6a72);
+  --accent-active: color-mix(in srgb, #8da101 78%, #5c6a72);
+  --chart-1: #8da101;
+  --chart-2: color-mix(in srgb, #8da101 78%, #fdf6e3);
+  --chart-3: color-mix(in srgb, #8da101 58%, #fdf6e3);
+  --chart-4: color-mix(in srgb, #8da101 40%, #fdf6e3);
+  --chart-5: color-mix(in srgb, #8da101 24%, #fdf6e3);
+}
+
+[data-irina-theme="flexoki"] {
+  --surface-bg: #100f0f;
+  --surface-paper: #1c1b1a;
+  --surface-raised: #282726;
+  --text-ink: #cecdc3;
+  --text-muted: #6f6e69;
+  --rule: #575653;
+  --rule-hard: #6f6e69;
+  --accent: #da702c;
+  --accent-fg: #da702c;
+  --ok: #879a39;
+  --warn: #da702c;
+  --bad: #d14d41;
+  --surface-sunk: color-mix(in srgb, #cecdc3 12%, #100f0f);
+  --text-faint: color-mix(in srgb, #cecdc3 62%, #100f0f);
+  --scrollbar-thumb: color-mix(in srgb, #cecdc3 25%, transparent);
+  --accent-ink: #100f0f;
+  --accent-hover: color-mix(in srgb, #da702c 88%, #cecdc3);
+  --accent-active: color-mix(in srgb, #da702c 78%, #cecdc3);
+  --chart-1: #da702c;
+  --chart-2: color-mix(in srgb, #da702c 78%, #100f0f);
+  --chart-3: color-mix(in srgb, #da702c 58%, #100f0f);
+  --chart-4: color-mix(in srgb, #da702c 40%, #100f0f);
+  --chart-5: color-mix(in srgb, #da702c 24%, #100f0f);
+}
+
+[data-theme="light"][data-irina-theme="flexoki"] {
+  --surface-bg: #fffcf0;
+  --surface-paper: #f2f0e5;
+  --surface-raised: #e6e4d9;
+  --text-ink: #100f0f;
+  --text-muted: #6f6e69;
+  --rule: #b7b5ac;
+  --rule-hard: #878580;
+  --accent: #205ea6;
+  --accent-fg: #205ea6;
+  --ok: #66800b;
+  --warn: #bc5215;
+  --bad: #af3029;
+  --surface-sunk: color-mix(in srgb, #100f0f 12%, #fffcf0);
+  --text-faint: color-mix(in srgb, #100f0f 62%, #fffcf0);
+  --scrollbar-thumb: color-mix(in srgb, #100f0f 25%, transparent);
+  --accent-ink: #fffcf0;
+  --accent-hover: color-mix(in srgb, #205ea6 88%, #100f0f);
+  --accent-active: color-mix(in srgb, #205ea6 78%, #100f0f);
+  --chart-1: #205ea6;
+  --chart-2: color-mix(in srgb, #205ea6 78%, #fffcf0);
+  --chart-3: color-mix(in srgb, #205ea6 58%, #fffcf0);
+  --chart-4: color-mix(in srgb, #205ea6 40%, #fffcf0);
+  --chart-5: color-mix(in srgb, #205ea6 24%, #fffcf0);
+}
+
+[data-irina-theme="github"] {
+  --surface-bg: #0d1117;
+  --surface-paper: #010409;
+  --surface-raised: #161b22;
+  --text-ink: #c9d1d9;
+  --text-muted: #8b949e;
+  --rule: #30363d;
+  --rule-hard: #58a6ff;
+  --accent: #58a6ff;
+  --accent-fg: #58a6ff;
+  --ok: #3fb950;
+  --warn: #e3b341;
+  --bad: #f85149;
+  --surface-sunk: color-mix(in srgb, #c9d1d9 12%, #0d1117);
+  --text-faint: color-mix(in srgb, #c9d1d9 62%, #0d1117);
+  --scrollbar-thumb: color-mix(in srgb, #c9d1d9 25%, transparent);
+  --accent-ink: #0d1117;
+  --accent-hover: color-mix(in srgb, #58a6ff 88%, #c9d1d9);
+  --accent-active: color-mix(in srgb, #58a6ff 78%, #c9d1d9);
+  --chart-1: #58a6ff;
+  --chart-2: color-mix(in srgb, #58a6ff 78%, #0d1117);
+  --chart-3: color-mix(in srgb, #58a6ff 58%, #0d1117);
+  --chart-4: color-mix(in srgb, #58a6ff 40%, #0d1117);
+  --chart-5: color-mix(in srgb, #58a6ff 24%, #0d1117);
+}
+
+[data-theme="light"][data-irina-theme="github"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #f6f8fa;
+  --surface-raised: #f0f3f6;
+  --text-ink: #24292f;
+  --text-muted: #57606a;
+  --rule: #d0d7de;
+  --rule-hard: #0969da;
+  --accent: #0969da;
+  --accent-fg: #0969da;
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --bad: #cf222e;
+  --surface-sunk: color-mix(in srgb, #24292f 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #24292f 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #24292f 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #0969da 88%, #24292f);
+  --accent-active: color-mix(in srgb, #0969da 78%, #24292f);
+  --chart-1: #0969da;
+  --chart-2: color-mix(in srgb, #0969da 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #0969da 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #0969da 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #0969da 24%, #ffffff);
+}
+
+[data-irina-theme="gruvbox"] {
+  --surface-bg: #282828;
+  --surface-paper: #3c3836;
+  --surface-raised: #504945;
+  --text-ink: #ebdbb2;
+  --text-muted: #928374;
+  --rule: #665c54;
+  --rule-hard: #ebdbb2;
+  --accent: #83a598;
+  --accent-fg: #83a598;
+  --ok: #b8bb26;
+  --warn: #fe8019;
+  --bad: #fb4934;
+  --surface-sunk: color-mix(in srgb, #ebdbb2 12%, #282828);
+  --text-faint: color-mix(in srgb, #ebdbb2 62%, #282828);
+  --scrollbar-thumb: color-mix(in srgb, #ebdbb2 25%, transparent);
+  --accent-ink: #282828;
+  --accent-hover: color-mix(in srgb, #83a598 88%, #ebdbb2);
+  --accent-active: color-mix(in srgb, #83a598 78%, #ebdbb2);
+  --chart-1: #83a598;
+  --chart-2: color-mix(in srgb, #83a598 78%, #282828);
+  --chart-3: color-mix(in srgb, #83a598 58%, #282828);
+  --chart-4: color-mix(in srgb, #83a598 40%, #282828);
+  --chart-5: color-mix(in srgb, #83a598 24%, #282828);
+}
+
+[data-theme="light"][data-irina-theme="gruvbox"] {
+  --surface-bg: #fbf1c7;
+  --surface-paper: #ebdbb2;
+  --surface-raised: #d5c4a1;
+  --text-ink: #3c3836;
+  --text-muted: #7c6f64;
+  --rule: #bdae93;
+  --rule-hard: #3c3836;
+  --accent: #076678;
+  --accent-fg: #076678;
+  --ok: #79740e;
+  --warn: #af3a03;
+  --bad: #9d0006;
+  --surface-sunk: color-mix(in srgb, #3c3836 12%, #fbf1c7);
+  --text-faint: color-mix(in srgb, #3c3836 62%, #fbf1c7);
+  --scrollbar-thumb: color-mix(in srgb, #3c3836 25%, transparent);
+  --accent-ink: #fbf1c7;
+  --accent-hover: color-mix(in srgb, #076678 88%, #3c3836);
+  --accent-active: color-mix(in srgb, #076678 78%, #3c3836);
+  --chart-1: #076678;
+  --chart-2: color-mix(in srgb, #076678 78%, #fbf1c7);
+  --chart-3: color-mix(in srgb, #076678 58%, #fbf1c7);
+  --chart-4: color-mix(in srgb, #076678 40%, #fbf1c7);
+  --chart-5: color-mix(in srgb, #076678 24%, #fbf1c7);
+}
+
+[data-irina-theme="kanagawa"] {
+  --surface-bg: #1f1f28;
+  --surface-paper: #2a2a37;
+  --surface-raised: #363646;
+  --text-ink: #dcd7ba;
+  --text-muted: #727169;
+  --rule: #54546d;
+  --rule-hard: #c38d9d;
+  --accent: #7e9cd8;
+  --accent-fg: #7e9cd8;
+  --ok: #98bb6c;
+  --warn: #d7a657;
+  --bad: #e82424;
+  --surface-sunk: color-mix(in srgb, #dcd7ba 12%, #1f1f28);
+  --text-faint: color-mix(in srgb, #dcd7ba 62%, #1f1f28);
+  --scrollbar-thumb: color-mix(in srgb, #dcd7ba 25%, transparent);
+  --accent-ink: #1f1f28;
+  --accent-hover: color-mix(in srgb, #7e9cd8 88%, #dcd7ba);
+  --accent-active: color-mix(in srgb, #7e9cd8 78%, #dcd7ba);
+  --chart-1: #7e9cd8;
+  --chart-2: color-mix(in srgb, #7e9cd8 78%, #1f1f28);
+  --chart-3: color-mix(in srgb, #7e9cd8 58%, #1f1f28);
+  --chart-4: color-mix(in srgb, #7e9cd8 40%, #1f1f28);
+  --chart-5: color-mix(in srgb, #7e9cd8 24%, #1f1f28);
+}
+
+[data-theme="light"][data-irina-theme="kanagawa"] {
+  --surface-bg: #f2e9de;
+  --surface-paper: #eae4d7;
+  --surface-raised: #e3dcd2;
+  --text-ink: #54433a;
+  --text-muted: #9e9389;
+  --rule: #d4cbbf;
+  --rule-hard: #c38d9d;
+  --accent: #2d4f67;
+  --accent-fg: #2d4f67;
+  --ok: #98bb6c;
+  --warn: #d7a657;
+  --bad: #e82424;
+  --surface-sunk: color-mix(in srgb, #54433a 12%, #f2e9de);
+  --text-faint: color-mix(in srgb, #54433a 62%, #f2e9de);
+  --scrollbar-thumb: color-mix(in srgb, #54433a 25%, transparent);
+  --accent-ink: #f2e9de;
+  --accent-hover: color-mix(in srgb, #2d4f67 88%, #54433a);
+  --accent-active: color-mix(in srgb, #2d4f67 78%, #54433a);
+  --chart-1: #2d4f67;
+  --chart-2: color-mix(in srgb, #2d4f67 78%, #f2e9de);
+  --chart-3: color-mix(in srgb, #2d4f67 58%, #f2e9de);
+  --chart-4: color-mix(in srgb, #2d4f67 40%, #f2e9de);
+  --chart-5: color-mix(in srgb, #2d4f67 24%, #f2e9de);
+}
+
+[data-irina-theme="lucent-orng"] {
+  --text-ink: #eeeeee;
+  --text-muted: #808080;
+  --rule: #ec5b2b;
+  --rule-hard: #ee7948;
+  --accent: #ec5b2b;
+  --accent-fg: #ec5b2b;
+  --ok: #6ba1e6;
+  --warn: #ec5b2b;
+  --bad: #e06c75;
+}
+
+[data-theme="light"][data-irina-theme="lucent-orng"] {
+  --text-ink: #1a1a1a;
+  --text-muted: #8a8a8a;
+  --rule: #ec5b2b;
+  --rule-hard: #c94d24;
+  --accent: #ec5b2b;
+  --accent-fg: #ec5b2b;
+  --ok: #0062d1;
+  --warn: #ec5b2b;
+  --bad: #d1383d;
+}
+
+[data-irina-theme="material"] {
+  --surface-bg: #263238;
+  --surface-paper: #1e272c;
+  --surface-raised: #37474f;
+  --text-ink: #eeffff;
+  --text-muted: #546e7a;
+  --rule: #37474f;
+  --rule-hard: #82aaff;
+  --accent: #82aaff;
+  --accent-fg: #82aaff;
+  --ok: #c3e88d;
+  --warn: #ffcb6b;
+  --bad: #f07178;
+  --surface-sunk: color-mix(in srgb, #eeffff 12%, #263238);
+  --text-faint: color-mix(in srgb, #eeffff 62%, #263238);
+  --scrollbar-thumb: color-mix(in srgb, #eeffff 25%, transparent);
+  --accent-ink: #263238;
+  --accent-hover: color-mix(in srgb, #82aaff 88%, #eeffff);
+  --accent-active: color-mix(in srgb, #82aaff 78%, #eeffff);
+  --chart-1: #82aaff;
+  --chart-2: color-mix(in srgb, #82aaff 78%, #263238);
+  --chart-3: color-mix(in srgb, #82aaff 58%, #263238);
+  --chart-4: color-mix(in srgb, #82aaff 40%, #263238);
+  --chart-5: color-mix(in srgb, #82aaff 24%, #263238);
+}
+
+[data-theme="light"][data-irina-theme="material"] {
+  --surface-bg: #fafafa;
+  --surface-paper: #f5f5f5;
+  --surface-raised: #e7e7e8;
+  --text-ink: #263238;
+  --text-muted: #90a4ae;
+  --rule: #e0e0e0;
+  --rule-hard: #6182b8;
+  --accent: #6182b8;
+  --accent-fg: #6182b8;
+  --ok: #91b859;
+  --warn: #ffb300;
+  --bad: #e53935;
+  --surface-sunk: color-mix(in srgb, #263238 12%, #fafafa);
+  --text-faint: color-mix(in srgb, #263238 62%, #fafafa);
+  --scrollbar-thumb: color-mix(in srgb, #263238 25%, transparent);
+  --accent-ink: #fafafa;
+  --accent-hover: color-mix(in srgb, #6182b8 88%, #263238);
+  --accent-active: color-mix(in srgb, #6182b8 78%, #263238);
+  --chart-1: #6182b8;
+  --chart-2: color-mix(in srgb, #6182b8 78%, #fafafa);
+  --chart-3: color-mix(in srgb, #6182b8 58%, #fafafa);
+  --chart-4: color-mix(in srgb, #6182b8 40%, #fafafa);
+  --chart-5: color-mix(in srgb, #6182b8 24%, #fafafa);
+}
+
+[data-irina-theme="matrix"] {
+  --surface-bg: #0a0e0a;
+  --surface-paper: #0e130d;
+  --surface-raised: #141c12;
+  --text-ink: #62ff94;
+  --text-muted: #8ca391;
+  --rule: #1e2a1b;
+  --rule-hard: #2eff6a;
+  --accent: #2eff6a;
+  --accent-fg: #2eff6a;
+  --ok: #62ff94;
+  --warn: #e6ff57;
+  --bad: #ff4b4b;
+  --surface-sunk: color-mix(in srgb, #62ff94 12%, #0a0e0a);
+  --text-faint: color-mix(in srgb, #62ff94 62%, #0a0e0a);
+  --scrollbar-thumb: color-mix(in srgb, #62ff94 25%, transparent);
+  --accent-ink: #0a0e0a;
+  --accent-hover: color-mix(in srgb, #2eff6a 88%, #62ff94);
+  --accent-active: color-mix(in srgb, #2eff6a 78%, #62ff94);
+  --chart-1: #2eff6a;
+  --chart-2: color-mix(in srgb, #2eff6a 78%, #0a0e0a);
+  --chart-3: color-mix(in srgb, #2eff6a 58%, #0a0e0a);
+  --chart-4: color-mix(in srgb, #2eff6a 40%, #0a0e0a);
+  --chart-5: color-mix(in srgb, #2eff6a 24%, #0a0e0a);
+}
+
+[data-theme="light"][data-irina-theme="matrix"] {
+  --surface-bg: #eef3ea;
+  --surface-paper: #e4ebe1;
+  --surface-raised: #dae1d7;
+  --text-ink: #203022;
+  --text-muted: #748476;
+  --rule: #748476;
+  --rule-hard: #1cc24b;
+  --accent: #1cc24b;
+  --accent-fg: #1cc24b;
+  --ok: #1cc24b;
+  --warn: #e6ff57;
+  --bad: #ff4b4b;
+  --surface-sunk: color-mix(in srgb, #203022 12%, #eef3ea);
+  --text-faint: color-mix(in srgb, #203022 62%, #eef3ea);
+  --scrollbar-thumb: color-mix(in srgb, #203022 25%, transparent);
+  --accent-ink: #eef3ea;
+  --accent-hover: color-mix(in srgb, #1cc24b 88%, #203022);
+  --accent-active: color-mix(in srgb, #1cc24b 78%, #203022);
+  --chart-1: #1cc24b;
+  --chart-2: color-mix(in srgb, #1cc24b 78%, #eef3ea);
+  --chart-3: color-mix(in srgb, #1cc24b 58%, #eef3ea);
+  --chart-4: color-mix(in srgb, #1cc24b 40%, #eef3ea);
+  --chart-5: color-mix(in srgb, #1cc24b 24%, #eef3ea);
+}
+
+[data-irina-theme="mercury"] {
+  --surface-bg: #171721;
+  --surface-paper: #10101a;
+  --surface-raised: #272735;
+  --text-ink: #dddde5;
+  --text-muted: #9d9da8;
+  --rule: #b4b7c8;
+  --rule-hard: #8da4f5;
+  --accent: #8da4f5;
+  --accent-fg: #8da4f5;
+  --ok: #77c599;
+  --warn: #fc9b6f;
+  --bad: #fc92b4;
+  --surface-sunk: color-mix(in srgb, #dddde5 12%, #171721);
+  --text-faint: color-mix(in srgb, #dddde5 62%, #171721);
+  --scrollbar-thumb: color-mix(in srgb, #dddde5 25%, transparent);
+  --accent-ink: #171721;
+  --accent-hover: color-mix(in srgb, #8da4f5 88%, #dddde5);
+  --accent-active: color-mix(in srgb, #8da4f5 78%, #dddde5);
+  --chart-1: #8da4f5;
+  --chart-2: color-mix(in srgb, #8da4f5 78%, #171721);
+  --chart-3: color-mix(in srgb, #8da4f5 58%, #171721);
+  --chart-4: color-mix(in srgb, #8da4f5 40%, #171721);
+  --chart-5: color-mix(in srgb, #8da4f5 24%, #171721);
+}
+
+[data-theme="light"][data-irina-theme="mercury"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #fbfcfd;
+  --surface-raised: #f4f5f9;
+  --text-ink: #363644;
+  --text-muted: #70707d;
+  --rule: #707393;
+  --rule-hard: #5266eb;
+  --accent: #5266eb;
+  --accent-fg: #5266eb;
+  --ok: #036e43;
+  --warn: #a44200;
+  --bad: #b0175f;
+  --surface-sunk: color-mix(in srgb, #363644 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #363644 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #363644 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #5266eb 88%, #363644);
+  --accent-active: color-mix(in srgb, #5266eb 78%, #363644);
+  --chart-1: #5266eb;
+  --chart-2: color-mix(in srgb, #5266eb 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #5266eb 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #5266eb 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #5266eb 24%, #ffffff);
+}
+
+[data-irina-theme="monokai"] {
+  --surface-bg: #272822;
+  --surface-paper: #1e1f1c;
+  --surface-raised: #3e3d32;
+  --text-ink: #f8f8f2;
+  --text-muted: #75715e;
+  --rule: #3e3d32;
+  --rule-hard: #66d9ef;
+  --accent: #66d9ef;
+  --accent-fg: #66d9ef;
+  --ok: #a6e22e;
+  --warn: #e6db74;
+  --bad: #f92672;
+  --surface-sunk: color-mix(in srgb, #f8f8f2 12%, #272822);
+  --text-faint: color-mix(in srgb, #f8f8f2 62%, #272822);
+  --scrollbar-thumb: color-mix(in srgb, #f8f8f2 25%, transparent);
+  --accent-ink: #272822;
+  --accent-hover: color-mix(in srgb, #66d9ef 88%, #f8f8f2);
+  --accent-active: color-mix(in srgb, #66d9ef 78%, #f8f8f2);
+  --chart-1: #66d9ef;
+  --chart-2: color-mix(in srgb, #66d9ef 78%, #272822);
+  --chart-3: color-mix(in srgb, #66d9ef 58%, #272822);
+  --chart-4: color-mix(in srgb, #66d9ef 40%, #272822);
+  --chart-5: color-mix(in srgb, #66d9ef 24%, #272822);
+}
+
+[data-theme="light"][data-irina-theme="monokai"] {
+  --surface-bg: #fafafa;
+  --surface-paper: #f0f0f0;
+  --surface-raised: #e0e0e0;
+  --text-ink: #272822;
+  --text-muted: #75715e;
+  --rule: #d0d0d0;
+  --rule-hard: #66d9ef;
+  --accent: #66d9ef;
+  --accent-fg: #66d9ef;
+  --ok: #a6e22e;
+  --warn: #fd971f;
+  --bad: #f92672;
+  --surface-sunk: color-mix(in srgb, #272822 12%, #fafafa);
+  --text-faint: color-mix(in srgb, #272822 62%, #fafafa);
+  --scrollbar-thumb: color-mix(in srgb, #272822 25%, transparent);
+  --accent-ink: #fafafa;
+  --accent-hover: color-mix(in srgb, #66d9ef 88%, #272822);
+  --accent-active: color-mix(in srgb, #66d9ef 78%, #272822);
+  --chart-1: #66d9ef;
+  --chart-2: color-mix(in srgb, #66d9ef 78%, #fafafa);
+  --chart-3: color-mix(in srgb, #66d9ef 58%, #fafafa);
+  --chart-4: color-mix(in srgb, #66d9ef 40%, #fafafa);
+  --chart-5: color-mix(in srgb, #66d9ef 24%, #fafafa);
+}
+
+[data-irina-theme="nightowl"] {
+  --surface-bg: #011627;
+  --surface-paper: #0b253a;
+  --surface-raised: #0b253a;
+  --text-ink: #d6deeb;
+  --text-muted: #5f7e97;
+  --rule: #5f7e97;
+  --rule-hard: #82aaff;
+  --accent: #82aaff;
+  --accent-fg: #82aaff;
+  --ok: #c5e478;
+  --warn: #ecc48d;
+  --bad: #ef5350;
+  --surface-sunk: color-mix(in srgb, #d6deeb 12%, #011627);
+  --text-faint: color-mix(in srgb, #d6deeb 62%, #011627);
+  --scrollbar-thumb: color-mix(in srgb, #d6deeb 25%, transparent);
+  --accent-ink: #011627;
+  --accent-hover: color-mix(in srgb, #82aaff 88%, #d6deeb);
+  --accent-active: color-mix(in srgb, #82aaff 78%, #d6deeb);
+  --chart-1: #82aaff;
+  --chart-2: color-mix(in srgb, #82aaff 78%, #011627);
+  --chart-3: color-mix(in srgb, #82aaff 58%, #011627);
+  --chart-4: color-mix(in srgb, #82aaff 40%, #011627);
+  --chart-5: color-mix(in srgb, #82aaff 24%, #011627);
+}
+
+[data-theme="light"][data-irina-theme="nightowl"] {
+  --surface-bg: #011627;
+  --surface-paper: #0b253a;
+  --surface-raised: #0b253a;
+  --text-ink: #d6deeb;
+  --text-muted: #5f7e97;
+  --rule: #5f7e97;
+  --rule-hard: #82aaff;
+  --accent: #82aaff;
+  --accent-fg: #82aaff;
+  --ok: #c5e478;
+  --warn: #ecc48d;
+  --bad: #ef5350;
+  --surface-sunk: color-mix(in srgb, #d6deeb 12%, #011627);
+  --text-faint: color-mix(in srgb, #d6deeb 62%, #011627);
+  --scrollbar-thumb: color-mix(in srgb, #d6deeb 25%, transparent);
+  --accent-ink: #011627;
+  --accent-hover: color-mix(in srgb, #82aaff 88%, #d6deeb);
+  --accent-active: color-mix(in srgb, #82aaff 78%, #d6deeb);
+  --chart-1: #82aaff;
+  --chart-2: color-mix(in srgb, #82aaff 78%, #011627);
+  --chart-3: color-mix(in srgb, #82aaff 58%, #011627);
+  --chart-4: color-mix(in srgb, #82aaff 40%, #011627);
+  --chart-5: color-mix(in srgb, #82aaff 24%, #011627);
+}
+
+[data-irina-theme="nord"] {
+  --surface-bg: #2e3440;
+  --surface-paper: #3b4252;
+  --surface-raised: #434c5e;
+  --text-ink: #eceff4;
+  --text-muted: #8b95a7;
+  --rule: #434c5e;
+  --rule-hard: #4c566a;
+  --accent: #88c0d0;
+  --accent-fg: #88c0d0;
+  --ok: #a3be8c;
+  --warn: #d08770;
+  --bad: #bf616a;
+  --surface-sunk: color-mix(in srgb, #eceff4 12%, #2e3440);
+  --text-faint: color-mix(in srgb, #eceff4 62%, #2e3440);
+  --scrollbar-thumb: color-mix(in srgb, #eceff4 25%, transparent);
+  --accent-ink: #2e3440;
+  --accent-hover: color-mix(in srgb, #88c0d0 88%, #eceff4);
+  --accent-active: color-mix(in srgb, #88c0d0 78%, #eceff4);
+  --chart-1: #88c0d0;
+  --chart-2: color-mix(in srgb, #88c0d0 78%, #2e3440);
+  --chart-3: color-mix(in srgb, #88c0d0 58%, #2e3440);
+  --chart-4: color-mix(in srgb, #88c0d0 40%, #2e3440);
+  --chart-5: color-mix(in srgb, #88c0d0 24%, #2e3440);
+}
+
+[data-theme="light"][data-irina-theme="nord"] {
+  --surface-bg: #eceff4;
+  --surface-paper: #e5e9f0;
+  --surface-raised: #d8dee9;
+  --text-ink: #2e3440;
+  --text-muted: #3b4252;
+  --rule: #4c566a;
+  --rule-hard: #434c5e;
+  --accent: #5e81ac;
+  --accent-fg: #5e81ac;
+  --ok: #a3be8c;
+  --warn: #d08770;
+  --bad: #bf616a;
+  --surface-sunk: color-mix(in srgb, #2e3440 12%, #eceff4);
+  --text-faint: color-mix(in srgb, #2e3440 62%, #eceff4);
+  --scrollbar-thumb: color-mix(in srgb, #2e3440 25%, transparent);
+  --accent-ink: #eceff4;
+  --accent-hover: color-mix(in srgb, #5e81ac 88%, #2e3440);
+  --accent-active: color-mix(in srgb, #5e81ac 78%, #2e3440);
+  --chart-1: #5e81ac;
+  --chart-2: color-mix(in srgb, #5e81ac 78%, #eceff4);
+  --chart-3: color-mix(in srgb, #5e81ac 58%, #eceff4);
+  --chart-4: color-mix(in srgb, #5e81ac 40%, #eceff4);
+  --chart-5: color-mix(in srgb, #5e81ac 24%, #eceff4);
+}
+
+[data-irina-theme="one-dark"] {
+  --surface-bg: #282c34;
+  --surface-paper: #21252b;
+  --surface-raised: #353b45;
+  --text-ink: #abb2bf;
+  --text-muted: #5c6370;
+  --rule: #393f4a;
+  --rule-hard: #61afef;
+  --accent: #61afef;
+  --accent-fg: #61afef;
+  --ok: #98c379;
+  --warn: #e5c07b;
+  --bad: #e06c75;
+  --surface-sunk: color-mix(in srgb, #abb2bf 12%, #282c34);
+  --text-faint: color-mix(in srgb, #abb2bf 62%, #282c34);
+  --scrollbar-thumb: color-mix(in srgb, #abb2bf 25%, transparent);
+  --accent-ink: #282c34;
+  --accent-hover: color-mix(in srgb, #61afef 88%, #abb2bf);
+  --accent-active: color-mix(in srgb, #61afef 78%, #abb2bf);
+  --chart-1: #61afef;
+  --chart-2: color-mix(in srgb, #61afef 78%, #282c34);
+  --chart-3: color-mix(in srgb, #61afef 58%, #282c34);
+  --chart-4: color-mix(in srgb, #61afef 40%, #282c34);
+  --chart-5: color-mix(in srgb, #61afef 24%, #282c34);
+}
+
+[data-theme="light"][data-irina-theme="one-dark"] {
+  --surface-bg: #fafafa;
+  --surface-paper: #f0f0f1;
+  --surface-raised: #eaeaeb;
+  --text-ink: #383a42;
+  --text-muted: #a0a1a7;
+  --rule: #d1d1d2;
+  --rule-hard: #4078f2;
+  --accent: #4078f2;
+  --accent-fg: #4078f2;
+  --ok: #50a14f;
+  --warn: #c18401;
+  --bad: #e45649;
+  --surface-sunk: color-mix(in srgb, #383a42 12%, #fafafa);
+  --text-faint: color-mix(in srgb, #383a42 62%, #fafafa);
+  --scrollbar-thumb: color-mix(in srgb, #383a42 25%, transparent);
+  --accent-ink: #fafafa;
+  --accent-hover: color-mix(in srgb, #4078f2 88%, #383a42);
+  --accent-active: color-mix(in srgb, #4078f2 78%, #383a42);
+  --chart-1: #4078f2;
+  --chart-2: color-mix(in srgb, #4078f2 78%, #fafafa);
+  --chart-3: color-mix(in srgb, #4078f2 58%, #fafafa);
+  --chart-4: color-mix(in srgb, #4078f2 40%, #fafafa);
+  --chart-5: color-mix(in srgb, #4078f2 24%, #fafafa);
+}
+
+[data-irina-theme="opencode"] {
+  --surface-bg: #0a0a0a;
+  --surface-paper: #141414;
+  --surface-raised: #1e1e1e;
+  --text-ink: #eeeeee;
+  --text-muted: #808080;
+  --rule: #484848;
+  --rule-hard: #606060;
+  --accent: #fab283;
+  --accent-fg: #fab283;
+  --ok: #7fd88f;
+  --warn: #f5a742;
+  --bad: #e06c75;
+  --surface-sunk: color-mix(in srgb, #eeeeee 12%, #0a0a0a);
+  --text-faint: color-mix(in srgb, #eeeeee 62%, #0a0a0a);
+  --scrollbar-thumb: color-mix(in srgb, #eeeeee 25%, transparent);
+  --accent-ink: #0a0a0a;
+  --accent-hover: color-mix(in srgb, #fab283 88%, #eeeeee);
+  --accent-active: color-mix(in srgb, #fab283 78%, #eeeeee);
+  --chart-1: #fab283;
+  --chart-2: color-mix(in srgb, #fab283 78%, #0a0a0a);
+  --chart-3: color-mix(in srgb, #fab283 58%, #0a0a0a);
+  --chart-4: color-mix(in srgb, #fab283 40%, #0a0a0a);
+  --chart-5: color-mix(in srgb, #fab283 24%, #0a0a0a);
+}
+
+[data-theme="light"][data-irina-theme="opencode"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #fafafa;
+  --surface-raised: #f5f5f5;
+  --text-ink: #1a1a1a;
+  --text-muted: #8a8a8a;
+  --rule: #b8b8b8;
+  --rule-hard: #a0a0a0;
+  --accent: #3b7dd8;
+  --accent-fg: #3b7dd8;
+  --ok: #3d9a57;
+  --warn: #d68c27;
+  --bad: #d1383d;
+  --surface-sunk: color-mix(in srgb, #1a1a1a 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #1a1a1a 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #1a1a1a 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #3b7dd8 88%, #1a1a1a);
+  --accent-active: color-mix(in srgb, #3b7dd8 78%, #1a1a1a);
+  --chart-1: #3b7dd8;
+  --chart-2: color-mix(in srgb, #3b7dd8 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #3b7dd8 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #3b7dd8 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #3b7dd8 24%, #ffffff);
+}
+
+[data-irina-theme="orng"] {
+  --surface-bg: #0a0a0a;
+  --surface-paper: #141414;
+  --surface-raised: #1e1e1e;
+  --text-ink: #eeeeee;
+  --text-muted: #808080;
+  --rule: #ec5b2b;
+  --rule-hard: #ee7948;
+  --accent: #ec5b2b;
+  --accent-fg: #ec5b2b;
+  --ok: #6ba1e6;
+  --warn: #ec5b2b;
+  --bad: #e06c75;
+  --surface-sunk: color-mix(in srgb, #eeeeee 12%, #0a0a0a);
+  --text-faint: color-mix(in srgb, #eeeeee 62%, #0a0a0a);
+  --scrollbar-thumb: color-mix(in srgb, #eeeeee 25%, transparent);
+  --accent-ink: #0a0a0a;
+  --accent-hover: color-mix(in srgb, #ec5b2b 88%, #eeeeee);
+  --accent-active: color-mix(in srgb, #ec5b2b 78%, #eeeeee);
+  --chart-1: #ec5b2b;
+  --chart-2: color-mix(in srgb, #ec5b2b 78%, #0a0a0a);
+  --chart-3: color-mix(in srgb, #ec5b2b 58%, #0a0a0a);
+  --chart-4: color-mix(in srgb, #ec5b2b 40%, #0a0a0a);
+  --chart-5: color-mix(in srgb, #ec5b2b 24%, #0a0a0a);
+}
+
+[data-theme="light"][data-irina-theme="orng"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #fff7f1;
+  --surface-raised: #f5f0eb;
+  --text-ink: #1a1a1a;
+  --text-muted: #8a8a8a;
+  --rule: #ec5b2b;
+  --rule-hard: #c94d24;
+  --accent: #ec5b2b;
+  --accent-fg: #ec5b2b;
+  --ok: #0062d1;
+  --warn: #ec5b2b;
+  --bad: #d1383d;
+  --surface-sunk: color-mix(in srgb, #1a1a1a 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #1a1a1a 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #1a1a1a 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #ec5b2b 88%, #1a1a1a);
+  --accent-active: color-mix(in srgb, #ec5b2b 78%, #1a1a1a);
+  --chart-1: #ec5b2b;
+  --chart-2: color-mix(in srgb, #ec5b2b 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #ec5b2b 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #ec5b2b 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #ec5b2b 24%, #ffffff);
+}
+
+[data-irina-theme="osaka-jade"] {
+  --surface-bg: #111c18;
+  --surface-paper: #1a2520;
+  --surface-raised: #23372b;
+  --text-ink: #c1c497;
+  --text-muted: #53685b;
+  --rule: #3d4a44;
+  --rule-hard: #2dd5b7;
+  --accent: #2dd5b7;
+  --accent-fg: #2dd5b7;
+  --ok: #549e6a;
+  --warn: #e5c736;
+  --bad: #ff5345;
+  --surface-sunk: color-mix(in srgb, #c1c497 12%, #111c18);
+  --text-faint: color-mix(in srgb, #c1c497 62%, #111c18);
+  --scrollbar-thumb: color-mix(in srgb, #c1c497 25%, transparent);
+  --accent-ink: #111c18;
+  --accent-hover: color-mix(in srgb, #2dd5b7 88%, #c1c497);
+  --accent-active: color-mix(in srgb, #2dd5b7 78%, #c1c497);
+  --chart-1: #2dd5b7;
+  --chart-2: color-mix(in srgb, #2dd5b7 78%, #111c18);
+  --chart-3: color-mix(in srgb, #2dd5b7 58%, #111c18);
+  --chart-4: color-mix(in srgb, #2dd5b7 40%, #111c18);
+  --chart-5: color-mix(in srgb, #2dd5b7 24%, #111c18);
+}
+
+[data-theme="light"][data-irina-theme="osaka-jade"] {
+  --surface-bg: #f6f5dd;
+  --surface-paper: #e8e7cc;
+  --surface-raised: #d5d4b8;
+  --text-ink: #111c18;
+  --text-muted: #53685b;
+  --rule: #a8a78c;
+  --rule-hard: #1faa90;
+  --accent: #1faa90;
+  --accent-fg: #1faa90;
+  --ok: #3d7a52;
+  --warn: #b5a020;
+  --bad: #c7392d;
+  --surface-sunk: color-mix(in srgb, #111c18 12%, #f6f5dd);
+  --text-faint: color-mix(in srgb, #111c18 62%, #f6f5dd);
+  --scrollbar-thumb: color-mix(in srgb, #111c18 25%, transparent);
+  --accent-ink: #f6f5dd;
+  --accent-hover: color-mix(in srgb, #1faa90 88%, #111c18);
+  --accent-active: color-mix(in srgb, #1faa90 78%, #111c18);
+  --chart-1: #1faa90;
+  --chart-2: color-mix(in srgb, #1faa90 78%, #f6f5dd);
+  --chart-3: color-mix(in srgb, #1faa90 58%, #f6f5dd);
+  --chart-4: color-mix(in srgb, #1faa90 40%, #f6f5dd);
+  --chart-5: color-mix(in srgb, #1faa90 24%, #f6f5dd);
+}
+
+[data-irina-theme="palenight"] {
+  --surface-bg: #292d3e;
+  --surface-paper: #1e2132;
+  --surface-raised: #32364a;
+  --text-ink: #a6accd;
+  --text-muted: #676e95;
+  --rule: #32364a;
+  --rule-hard: #82aaff;
+  --accent: #82aaff;
+  --accent-fg: #82aaff;
+  --ok: #c3e88d;
+  --warn: #ffcb6b;
+  --bad: #f07178;
+  --surface-sunk: color-mix(in srgb, #a6accd 12%, #292d3e);
+  --text-faint: color-mix(in srgb, #a6accd 62%, #292d3e);
+  --scrollbar-thumb: color-mix(in srgb, #a6accd 25%, transparent);
+  --accent-ink: #292d3e;
+  --accent-hover: color-mix(in srgb, #82aaff 88%, #a6accd);
+  --accent-active: color-mix(in srgb, #82aaff 78%, #a6accd);
+  --chart-1: #82aaff;
+  --chart-2: color-mix(in srgb, #82aaff 78%, #292d3e);
+  --chart-3: color-mix(in srgb, #82aaff 58%, #292d3e);
+  --chart-4: color-mix(in srgb, #82aaff 40%, #292d3e);
+  --chart-5: color-mix(in srgb, #82aaff 24%, #292d3e);
+}
+
+[data-theme="light"][data-irina-theme="palenight"] {
+  --surface-bg: #fafafa;
+  --surface-paper: #f5f5f5;
+  --surface-raised: #e7e7e8;
+  --text-ink: #292d3e;
+  --text-muted: #8796b0;
+  --rule: #e0e0e0;
+  --rule-hard: #4976eb;
+  --accent: #4976eb;
+  --accent-fg: #4976eb;
+  --ok: #91b859;
+  --warn: #ffb300;
+  --bad: #e53935;
+  --surface-sunk: color-mix(in srgb, #292d3e 12%, #fafafa);
+  --text-faint: color-mix(in srgb, #292d3e 62%, #fafafa);
+  --scrollbar-thumb: color-mix(in srgb, #292d3e 25%, transparent);
+  --accent-ink: #fafafa;
+  --accent-hover: color-mix(in srgb, #4976eb 88%, #292d3e);
+  --accent-active: color-mix(in srgb, #4976eb 78%, #292d3e);
+  --chart-1: #4976eb;
+  --chart-2: color-mix(in srgb, #4976eb 78%, #fafafa);
+  --chart-3: color-mix(in srgb, #4976eb 58%, #fafafa);
+  --chart-4: color-mix(in srgb, #4976eb 40%, #fafafa);
+  --chart-5: color-mix(in srgb, #4976eb 24%, #fafafa);
+}
+
+[data-irina-theme="rosepine"] {
+  --surface-bg: #191724;
+  --surface-paper: #1f1d2e;
+  --surface-raised: #26233a;
+  --text-ink: #e0def4;
+  --text-muted: #6e6a86;
+  --rule: #403d52;
+  --rule-hard: #9ccfd8;
+  --accent: #9ccfd8;
+  --accent-fg: #9ccfd8;
+  --ok: #31748f;
+  --warn: #f6c177;
+  --bad: #eb6f92;
+  --surface-sunk: color-mix(in srgb, #e0def4 12%, #191724);
+  --text-faint: color-mix(in srgb, #e0def4 62%, #191724);
+  --scrollbar-thumb: color-mix(in srgb, #e0def4 25%, transparent);
+  --accent-ink: #191724;
+  --accent-hover: color-mix(in srgb, #9ccfd8 88%, #e0def4);
+  --accent-active: color-mix(in srgb, #9ccfd8 78%, #e0def4);
+  --chart-1: #9ccfd8;
+  --chart-2: color-mix(in srgb, #9ccfd8 78%, #191724);
+  --chart-3: color-mix(in srgb, #9ccfd8 58%, #191724);
+  --chart-4: color-mix(in srgb, #9ccfd8 40%, #191724);
+  --chart-5: color-mix(in srgb, #9ccfd8 24%, #191724);
+}
+
+[data-theme="light"][data-irina-theme="rosepine"] {
+  --surface-bg: #faf4ed;
+  --surface-paper: #fffaf3;
+  --surface-raised: #f2e9e1;
+  --text-ink: #575279;
+  --text-muted: #9893a5;
+  --rule: #dfdad9;
+  --rule-hard: #31748f;
+  --accent: #31748f;
+  --accent-fg: #31748f;
+  --ok: #286983;
+  --warn: #ea9d34;
+  --bad: #b4637a;
+  --surface-sunk: color-mix(in srgb, #575279 12%, #faf4ed);
+  --text-faint: color-mix(in srgb, #575279 62%, #faf4ed);
+  --scrollbar-thumb: color-mix(in srgb, #575279 25%, transparent);
+  --accent-ink: #faf4ed;
+  --accent-hover: color-mix(in srgb, #31748f 88%, #575279);
+  --accent-active: color-mix(in srgb, #31748f 78%, #575279);
+  --chart-1: #31748f;
+  --chart-2: color-mix(in srgb, #31748f 78%, #faf4ed);
+  --chart-3: color-mix(in srgb, #31748f 58%, #faf4ed);
+  --chart-4: color-mix(in srgb, #31748f 40%, #faf4ed);
+  --chart-5: color-mix(in srgb, #31748f 24%, #faf4ed);
+}
+
+[data-irina-theme="solarized"] {
+  --surface-bg: #002b36;
+  --surface-paper: #073642;
+  --surface-raised: #073642;
+  --text-ink: #839496;
+  --text-muted: #586e75;
+  --rule: #073642;
+  --rule-hard: #586e75;
+  --accent: #268bd2;
+  --accent-fg: #268bd2;
+  --ok: #859900;
+  --warn: #b58900;
+  --bad: #dc322f;
+  --surface-sunk: color-mix(in srgb, #839496 12%, #002b36);
+  --text-faint: color-mix(in srgb, #839496 62%, #002b36);
+  --scrollbar-thumb: color-mix(in srgb, #839496 25%, transparent);
+  --accent-ink: #002b36;
+  --accent-hover: color-mix(in srgb, #268bd2 88%, #839496);
+  --accent-active: color-mix(in srgb, #268bd2 78%, #839496);
+  --chart-1: #268bd2;
+  --chart-2: color-mix(in srgb, #268bd2 78%, #002b36);
+  --chart-3: color-mix(in srgb, #268bd2 58%, #002b36);
+  --chart-4: color-mix(in srgb, #268bd2 40%, #002b36);
+  --chart-5: color-mix(in srgb, #268bd2 24%, #002b36);
+}
+
+[data-theme="light"][data-irina-theme="solarized"] {
+  --surface-bg: #fdf6e3;
+  --surface-paper: #eee8d5;
+  --surface-raised: #eee8d5;
+  --text-ink: #657b83;
+  --text-muted: #93a1a1;
+  --rule: #eee8d5;
+  --rule-hard: #93a1a1;
+  --accent: #268bd2;
+  --accent-fg: #268bd2;
+  --ok: #859900;
+  --warn: #b58900;
+  --bad: #dc322f;
+  --surface-sunk: color-mix(in srgb, #657b83 12%, #fdf6e3);
+  --text-faint: color-mix(in srgb, #657b83 62%, #fdf6e3);
+  --scrollbar-thumb: color-mix(in srgb, #657b83 25%, transparent);
+  --accent-ink: #fdf6e3;
+  --accent-hover: color-mix(in srgb, #268bd2 88%, #657b83);
+  --accent-active: color-mix(in srgb, #268bd2 78%, #657b83);
+  --chart-1: #268bd2;
+  --chart-2: color-mix(in srgb, #268bd2 78%, #fdf6e3);
+  --chart-3: color-mix(in srgb, #268bd2 58%, #fdf6e3);
+  --chart-4: color-mix(in srgb, #268bd2 40%, #fdf6e3);
+  --chart-5: color-mix(in srgb, #268bd2 24%, #fdf6e3);
+}
+
+[data-irina-theme="synthwave84"] {
+  --surface-bg: #262335;
+  --surface-paper: #1e1a29;
+  --surface-raised: #2a2139;
+  --text-ink: #ffffff;
+  --text-muted: #848bbd;
+  --rule: #495495;
+  --rule-hard: #36f9f6;
+  --accent: #36f9f6;
+  --accent-fg: #36f9f6;
+  --ok: #72f1b8;
+  --warn: #fede5d;
+  --bad: #fe4450;
+  --surface-sunk: color-mix(in srgb, #ffffff 12%, #262335);
+  --text-faint: color-mix(in srgb, #ffffff 62%, #262335);
+  --scrollbar-thumb: color-mix(in srgb, #ffffff 25%, transparent);
+  --accent-ink: #262335;
+  --accent-hover: color-mix(in srgb, #36f9f6 88%, #ffffff);
+  --accent-active: color-mix(in srgb, #36f9f6 78%, #ffffff);
+  --chart-1: #36f9f6;
+  --chart-2: color-mix(in srgb, #36f9f6 78%, #262335);
+  --chart-3: color-mix(in srgb, #36f9f6 58%, #262335);
+  --chart-4: color-mix(in srgb, #36f9f6 40%, #262335);
+  --chart-5: color-mix(in srgb, #36f9f6 24%, #262335);
+}
+
+[data-theme="light"][data-irina-theme="synthwave84"] {
+  --surface-bg: #fafafa;
+  --surface-paper: #f5f5f5;
+  --surface-raised: #eeeeee;
+  --text-ink: #262335;
+  --text-muted: #5c5c8a;
+  --rule: #e0e0e0;
+  --rule-hard: #00bcd4;
+  --accent: #00bcd4;
+  --accent-fg: #00bcd4;
+  --ok: #4caf50;
+  --warn: #ff9800;
+  --bad: #f44336;
+  --surface-sunk: color-mix(in srgb, #262335 12%, #fafafa);
+  --text-faint: color-mix(in srgb, #262335 62%, #fafafa);
+  --scrollbar-thumb: color-mix(in srgb, #262335 25%, transparent);
+  --accent-ink: #fafafa;
+  --accent-hover: color-mix(in srgb, #00bcd4 88%, #262335);
+  --accent-active: color-mix(in srgb, #00bcd4 78%, #262335);
+  --chart-1: #00bcd4;
+  --chart-2: color-mix(in srgb, #00bcd4 78%, #fafafa);
+  --chart-3: color-mix(in srgb, #00bcd4 58%, #fafafa);
+  --chart-4: color-mix(in srgb, #00bcd4 40%, #fafafa);
+  --chart-5: color-mix(in srgb, #00bcd4 24%, #fafafa);
+}
+
+[data-irina-theme="tokyonight"] {
+  --surface-bg: #1a1b26;
+  --surface-paper: #1e2030;
+  --surface-raised: #222436;
+  --text-ink: #c8d3f5;
+  --text-muted: #828bb8;
+  --rule: #737aa2;
+  --rule-hard: #9099b2;
+  --accent: #82aaff;
+  --accent-fg: #82aaff;
+  --ok: #c3e88d;
+  --warn: #ff966c;
+  --bad: #ff757f;
+  --surface-sunk: color-mix(in srgb, #c8d3f5 12%, #1a1b26);
+  --text-faint: color-mix(in srgb, #c8d3f5 62%, #1a1b26);
+  --scrollbar-thumb: color-mix(in srgb, #c8d3f5 25%, transparent);
+  --accent-ink: #1a1b26;
+  --accent-hover: color-mix(in srgb, #82aaff 88%, #c8d3f5);
+  --accent-active: color-mix(in srgb, #82aaff 78%, #c8d3f5);
+  --chart-1: #82aaff;
+  --chart-2: color-mix(in srgb, #82aaff 78%, #1a1b26);
+  --chart-3: color-mix(in srgb, #82aaff 58%, #1a1b26);
+  --chart-4: color-mix(in srgb, #82aaff 40%, #1a1b26);
+  --chart-5: color-mix(in srgb, #82aaff 24%, #1a1b26);
+}
+
+[data-theme="light"][data-irina-theme="tokyonight"] {
+  --surface-bg: #e1e2e7;
+  --surface-paper: #d5d6db;
+  --surface-raised: #c8c9ce;
+  --text-ink: #3760bf;
+  --text-muted: #8990a3;
+  --rule: #737a8c;
+  --rule-hard: #5a607d;
+  --accent: #2e7de9;
+  --accent-fg: #2e7de9;
+  --ok: #587539;
+  --warn: #b15c00;
+  --bad: #f52a65;
+  --surface-sunk: color-mix(in srgb, #3760bf 12%, #e1e2e7);
+  --text-faint: color-mix(in srgb, #3760bf 62%, #e1e2e7);
+  --scrollbar-thumb: color-mix(in srgb, #3760bf 25%, transparent);
+  --accent-ink: #e1e2e7;
+  --accent-hover: color-mix(in srgb, #2e7de9 88%, #3760bf);
+  --accent-active: color-mix(in srgb, #2e7de9 78%, #3760bf);
+  --chart-1: #2e7de9;
+  --chart-2: color-mix(in srgb, #2e7de9 78%, #e1e2e7);
+  --chart-3: color-mix(in srgb, #2e7de9 58%, #e1e2e7);
+  --chart-4: color-mix(in srgb, #2e7de9 40%, #e1e2e7);
+  --chart-5: color-mix(in srgb, #2e7de9 24%, #e1e2e7);
+}
+
+[data-irina-theme="vercel"] {
+  --surface-bg: #000000;
+  --surface-paper: #1a1a1a;
+  --surface-raised: #292929;
+  --text-ink: #ededed;
+  --text-muted: #878787;
+  --rule: #1f1f1f;
+  --rule-hard: #454545;
+  --accent: #0070f3;
+  --accent-fg: #0070f3;
+  --ok: #46a758;
+  --warn: #ffb224;
+  --bad: #e5484d;
+  --surface-sunk: color-mix(in srgb, #ededed 12%, #000000);
+  --text-faint: color-mix(in srgb, #ededed 62%, #000000);
+  --scrollbar-thumb: color-mix(in srgb, #ededed 25%, transparent);
+  --accent-ink: #000000;
+  --accent-hover: color-mix(in srgb, #0070f3 88%, #ededed);
+  --accent-active: color-mix(in srgb, #0070f3 78%, #ededed);
+  --chart-1: #0070f3;
+  --chart-2: color-mix(in srgb, #0070f3 78%, #000000);
+  --chart-3: color-mix(in srgb, #0070f3 58%, #000000);
+  --chart-4: color-mix(in srgb, #0070f3 40%, #000000);
+  --chart-5: color-mix(in srgb, #0070f3 24%, #000000);
+}
+
+[data-theme="light"][data-irina-theme="vercel"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #fafafa;
+  --surface-raised: #eaeaea;
+  --text-ink: #171717;
+  --text-muted: #666666;
+  --rule: #eaeaea;
+  --rule-hard: #999999;
+  --accent: #0070f3;
+  --accent-fg: #0070f3;
+  --ok: #388e3c;
+  --warn: #ff9500;
+  --bad: #dc3545;
+  --surface-sunk: color-mix(in srgb, #171717 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #171717 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #171717 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #0070f3 88%, #171717);
+  --accent-active: color-mix(in srgb, #0070f3 78%, #171717);
+  --chart-1: #0070f3;
+  --chart-2: color-mix(in srgb, #0070f3 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #0070f3 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #0070f3 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #0070f3 24%, #ffffff);
+}
+
+[data-irina-theme="vesper"] {
+  --surface-bg: #101010;
+  --surface-paper: #101010;
+  --surface-raised: #101010;
+  --text-ink: #ffffff;
+  --text-muted: #a0a0a0;
+  --rule: #282828;
+  --rule-hard: #ffc799;
+  --accent: #ffc799;
+  --accent-fg: #ffc799;
+  --ok: #99ffe4;
+  --warn: #ffc799;
+  --bad: #ff8080;
+  --surface-sunk: color-mix(in srgb, #ffffff 12%, #101010);
+  --text-faint: color-mix(in srgb, #ffffff 62%, #101010);
+  --scrollbar-thumb: color-mix(in srgb, #ffffff 25%, transparent);
+  --accent-ink: #101010;
+  --accent-hover: color-mix(in srgb, #ffc799 88%, #ffffff);
+  --accent-active: color-mix(in srgb, #ffc799 78%, #ffffff);
+  --chart-1: #ffc799;
+  --chart-2: color-mix(in srgb, #ffc799 78%, #101010);
+  --chart-3: color-mix(in srgb, #ffc799 58%, #101010);
+  --chart-4: color-mix(in srgb, #ffc799 40%, #101010);
+  --chart-5: color-mix(in srgb, #ffc799 24%, #101010);
+}
+
+[data-theme="light"][data-irina-theme="vesper"] {
+  --surface-bg: #ffffff;
+  --surface-paper: #f0f0f0;
+  --surface-raised: #e0e0e0;
+  --text-ink: #101010;
+  --text-muted: #a0a0a0;
+  --rule: #d0d0d0;
+  --rule-hard: #ffc799;
+  --accent: #ffc799;
+  --accent-fg: #ffc799;
+  --ok: #99ffe4;
+  --warn: #ffc799;
+  --bad: #ff8080;
+  --surface-sunk: color-mix(in srgb, #101010 12%, #ffffff);
+  --text-faint: color-mix(in srgb, #101010 62%, #ffffff);
+  --scrollbar-thumb: color-mix(in srgb, #101010 25%, transparent);
+  --accent-ink: #ffffff;
+  --accent-hover: color-mix(in srgb, #ffc799 88%, #101010);
+  --accent-active: color-mix(in srgb, #ffc799 78%, #101010);
+  --chart-1: #ffc799;
+  --chart-2: color-mix(in srgb, #ffc799 78%, #ffffff);
+  --chart-3: color-mix(in srgb, #ffc799 58%, #ffffff);
+  --chart-4: color-mix(in srgb, #ffc799 40%, #ffffff);
+  --chart-5: color-mix(in srgb, #ffc799 24%, #ffffff);
+}
+
+[data-irina-theme="zenburn"] {
+  --surface-bg: #3f3f3f;
+  --surface-paper: #4f4f4f;
+  --surface-raised: #5f5f5f;
+  --text-ink: #dcdccc;
+  --text-muted: #9f9f9f;
+  --rule: #5f5f5f;
+  --rule-hard: #8cd0d3;
+  --accent: #8cd0d3;
+  --accent-fg: #8cd0d3;
+  --ok: #7f9f7f;
+  --warn: #f0dfaf;
+  --bad: #cc9393;
+  --surface-sunk: color-mix(in srgb, #dcdccc 12%, #3f3f3f);
+  --text-faint: color-mix(in srgb, #dcdccc 62%, #3f3f3f);
+  --scrollbar-thumb: color-mix(in srgb, #dcdccc 25%, transparent);
+  --accent-ink: #3f3f3f;
+  --accent-hover: color-mix(in srgb, #8cd0d3 88%, #dcdccc);
+  --accent-active: color-mix(in srgb, #8cd0d3 78%, #dcdccc);
+  --chart-1: #8cd0d3;
+  --chart-2: color-mix(in srgb, #8cd0d3 78%, #3f3f3f);
+  --chart-3: color-mix(in srgb, #8cd0d3 58%, #3f3f3f);
+  --chart-4: color-mix(in srgb, #8cd0d3 40%, #3f3f3f);
+  --chart-5: color-mix(in srgb, #8cd0d3 24%, #3f3f3f);
+}
+
+[data-theme="light"][data-irina-theme="zenburn"] {
+  --surface-bg: #ffffef;
+  --surface-paper: #f5f5e5;
+  --surface-raised: #ebebdb;
+  --text-ink: #3f3f3f;
+  --text-muted: #6f6f6f;
+  --rule: #d0d0c0;
+  --rule-hard: #5f7f8f;
+  --accent: #5f7f8f;
+  --accent-fg: #5f7f8f;
+  --ok: #5f8f5f;
+  --warn: #8f8f5f;
+  --bad: #8f5f5f;
+  --surface-sunk: color-mix(in srgb, #3f3f3f 12%, #ffffef);
+  --text-faint: color-mix(in srgb, #3f3f3f 62%, #ffffef);
+  --scrollbar-thumb: color-mix(in srgb, #3f3f3f 25%, transparent);
+  --accent-ink: #ffffef;
+  --accent-hover: color-mix(in srgb, #5f7f8f 88%, #3f3f3f);
+  --accent-active: color-mix(in srgb, #5f7f8f 78%, #3f3f3f);
+  --chart-1: #5f7f8f;
+  --chart-2: color-mix(in srgb, #5f7f8f 78%, #ffffef);
+  --chart-3: color-mix(in srgb, #5f7f8f 58%, #ffffef);
+  --chart-4: color-mix(in srgb, #5f7f8f 40%, #ffffef);
+  --chart-5: color-mix(in srgb, #5f7f8f 24%, #ffffef);
+}
+
+/* The selector's options, so theme.js and this file cannot disagree. */
+:root { --irina-theme-count: 33; }
+/* aura ayu carbonfox catppuccin-frappe catppuccin-macchiato catppuccin cobalt2 cursor dracula everforest flexoki github gruvbox kanagawa lucent-orng material matrix mercury monokai nightowl nord one-dark opencode orng osaka-jade palenight rosepine solarized synthwave84 tokyonight vercel vesper zenburn */

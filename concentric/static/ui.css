@@ -404,20 +404,65 @@ body {
   background-clip: content-box;
 }
 
-/* ── 17. motion, only where it means something ──────────────────────────────
-   Nothing animates on load. The department chart's beats are its own (see
-   department.js), and this only softens how panels appear. */
-@keyframes irina-rise {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 1; transform: none; }
+/* ── 18. the theme picker ───────────────────────────────────────────────────
+   At the foot of the rail, above the GitHub link. Small and quiet: it is a
+   setting, not a feature. */
+.r-bottom { flex-wrap: wrap; }
+.irina-theme {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  border-top: var(--rule-width) solid var(--rule);
+  padding-top: var(--space-3);
 }
-#view > * { animation: irina-rise 0.28s var(--motion-ease) both; }
+.irina-theme-lbl {
+  font-family: var(--face-mono);
+  font-size: 0.68em;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: none;
+}
+#irina-theme {
+  flex: 1;
+  min-width: 0;
+  border-radius: 9px;
+  border: var(--rule-width) solid var(--rule);
+  background: var(--surface-paper);
+  color: var(--text-ink);
+  font-family: var(--face-mono);
+  font-size: var(--text-xs);
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--motion-ease),
+              box-shadow var(--motion-fast) var(--motion-ease);
+}
+#irina-theme:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--rule)); }
+#irina-theme:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+.rail.collapsed .irina-theme { display: none; }
 
+/* ── 19. motion, only where it means something ──────────────────────────────
+   Nothing animates on load, and nothing animates on a refresh.
+
+   There WAS an entrance animation here (#view > * rising and fading in). It had
+   to go: main.js re-renders #view every 5 seconds, which replaces those
+   elements, which restarts a CSS animation — so the whole page visibly jumped
+   every five seconds. An entrance animation and a periodic re-render cannot
+   both be true. The dashboard is now still, which is what a dashboard is for.
+
+   The department chart's own beats are unaffected: they are driven by
+   department.js and applied to SVG, not to #view's children. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
-  #view > * { animation: none; }
 }

@@ -132,26 +132,45 @@ def department_payload() -> dict:
 _RAIL = ('<div class="r-grp">Department</div>\n'
          '<a href="#department" data-v="department" data-short="D" '
          'aria-label="Department"><span class="lbl">Department</span></a>\n')
-_SCRIPT = '<script src="/department.js"></script>\n'
+_SCRIPT = ('<script src="/theme.js"></script>\n'
+           '<script src="/department.js"></script>\n')
 # The sidebar mark is a CSS mask pointing at waku's svg, so the URL lives in
 # style.css and cannot be swapped by editing markup. A later stylesheet wins at
-# equal specificity, so one rule at the end of <head> repoints it.
+# equal specificity, so one rule at the end of <head> repoints it. themes.css is
+# linked last of all: a chosen theme has to beat both waku's tokens and ui.css.
 _BRAND = ('<style>\n'
           '.r-top .mark{-webkit-mask:url(/irina-mark.svg) center/contain no-repeat;'
           'mask:url(/irina-mark.svg) center/contain no-repeat}\n'
           '</style>\n'
-          '<link rel="stylesheet" href="/ui.css">\n')
+          '<link rel="stylesheet" href="/ui.css">\n'
+          '<link rel="stylesheet" href="/themes.css">\n')
+
+
+def theme_names() -> list[str]:
+    """The themes themes.css defines, read out of it rather than listed twice."""
+    css = (Path(__file__).parent / "static" / "themes.css").read_text(encoding="utf-8")
+    return sorted(set(re.findall(r'\[data-irina-theme="([^"]+)"\]', css)))
+
+
+def _picker() -> str:
+    options = "".join(f'<option value="{name}">{name}</option>' for name in theme_names())
+    return ('<div class="r-bottom">\n'
+            '<label class="irina-theme" title="Dashboard theme">'
+            '<span class="irina-theme-lbl">Theme</span>'
+            f'<select id="irina-theme"><option value="">Default</option>{options}</select>'
+            '</label>\n')
 
 
 def _inject(html: str) -> str:
-    """Rename the shell to Irina and point it at her mark. Additive and
-    in-memory; waku's index.html is never written."""
+    """Rename the shell to Irina, give it her mark, a theme picker and the
+    department view. Additive and in-memory; waku's index.html is never written."""
     html = re.sub(r"<title>.*?</title>", "<title>Irina</title>", html, count=1)
     html = html.replace('href="/static/waku-mark.svg"', 'href="/irina-mark.svg"', 1)
     html = html.replace('<span class="r-name">WAKU</span>',
                         '<span class="r-name">IRINA</span>', 1)
     html = html.replace('<div class="r-grp">System</div>',
                         _RAIL + '<div class="r-grp">System</div>', 1)
+    html = html.replace('<div class="r-bottom">', _picker(), 1)
     html = html.replace("</head>", _BRAND + "</head>", 1)
     return html.replace('<script src="/static/js/main.js"></script>',
                         _SCRIPT + '<script src="/static/js/main.js"></script>', 1)
@@ -180,6 +199,14 @@ def _handler_class():
             if path == "/ui.css":
                 body = (Path(__file__).parent / "static" / "ui.css").read_bytes()
                 self._send(body, "text/css", no_cache=True)
+                return
+            if path == "/themes.css":
+                body = (Path(__file__).parent / "static" / "themes.css").read_bytes()
+                self._send(body, "text/css", no_cache=True)
+                return
+            if path == "/theme.js":
+                body = (Path(__file__).parent / "static" / "theme.js").read_bytes()
+                self._send(body, "text/javascript", no_cache=True)
                 return
             if path == "/":
                 html = (wd.STATIC / "index.html").read_text(encoding="utf-8")
