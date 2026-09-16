@@ -301,13 +301,15 @@
     const u = d.usage || {};
     const rows = u.by_seat || [];
     if (!rows.length) return "";
+    // `table()` maps over an ARRAY of <tr> strings; handing it a joined string
+    // threw "rows.map is not a function" and killed the whole view render.
     const body = rows.map((b) => `<tr>
         <td><code>${esc(b.seat)}</code></td>
-        <td class="meta">${b.calls}</td>
-        <td class="meta">${b.in.toLocaleString()}</td>
-        <td class="meta">${b.out.toLocaleString()}</td>
-        <td class="meta">${b.tool_calls}</td>
-        <td class="meta">${money(b.cost)}</td></tr>`).join("");
+        <td class="meta">${b.calls || 0}</td>
+        <td class="meta">${(b.in || 0).toLocaleString()}</td>
+        <td class="meta">${(b.out || 0).toLocaleString()}</td>
+        <td class="meta">${b.tool_calls || 0}</td>
+        <td class="meta">${money(b.cost || 0)}</td></tr>`);
     return `<h2>Spend by seat</h2>
       <div class="meta" style="margin-bottom:var(--space-3)">${esc(u.note || "")}</div>
       ${table(["seat", "LLM calls", "tokens in", "tokens out", "tool calls", "cost"], body)}`;
@@ -321,7 +323,7 @@
         <td class="meta">${r.facts || 0}</td>
         <td class="meta">${r.episodes || 0}</td>
         <td class="meta">${r.chat_log || 0}</td>
-        <td class="meta">${kb(r.size || 0)}</td></tr>`).join("");
+        <td class="meta">${kb(r.size || 0)}</td></tr>`);
     return `<h2>Memory by seat</h2>
       <div class="meta" style="margin-bottom:var(--space-3)">Each seat owns its own state.db.
         The tables above are the union of all of them; this is who owns what.</div>
@@ -335,7 +337,7 @@
         <td><code>${esc(s.seat || "?")}</code></td>
         <td class="meta">${esc(s.title || s.id || "")}</td>
         <td class="meta">${s.messages || 0}</td>
-        <td class="meta">${esc(s.last_at || "")}</td></tr>`).join("");
+        <td class="meta">${esc(s.last_at || "")}</td></tr>`);
     return `<h2>Conversations by seat</h2>
       <div class="meta" style="margin-bottom:var(--space-3)">Every seat keeps its own chat log.
         The inbox above is the union; this is which seat each thread belongs to.</div>
@@ -362,7 +364,7 @@
         <td class="meta">${esc((s.tools || []).join(", "))}</td>
         <td class="meta">${a.calls || 0}</td>
         <td class="meta">${money(a.cost || 0)}</td></tr>`;
-    }).join("");
+    });
     return `<h2>Seats that have run</h2>
       ${table(["seat", "ring", "tools", "LLM calls", "cost"], body)}`;
   }
