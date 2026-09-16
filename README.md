@@ -32,9 +32,7 @@ rather than in prompts.
 
 ## The department
 
-[![Irina's department — Irina, four CFOs, nineteen workers](docs/department.svg)](docs/department-demo.mp4)
-
-*Click the poster to watch the demo (4 min).*
+**[Watch the department demo (4 min)](docs/department-demo.mp4)** — Irina, four CFOs and nineteen workers, running.
 
 ```bash
 uv run python -m concentric                  # talk to Irina in the terminal
