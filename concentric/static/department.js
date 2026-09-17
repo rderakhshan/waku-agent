@@ -32,7 +32,7 @@
   const TITLE = { 0: 22.5, 1: 18, 2: 16.5 };
 
   const BEAT_MS = 1400;
-  const PAD = 40;                 // breathing room around the fitted graph
+  const PAD = 22;                 // breathing room around the fitted graph
   // Below this scale the names stop being readable. A fit that would go under it
   // is clamped instead: the whole graph stays a pan away, but the view the
   // reader lands on always has legible text.
@@ -141,8 +141,10 @@
   let cache = { key: "", result: null };
 
   function simulate(dep) {
-    const links = dep.edges.map((e) => [e.src, e.dst, 235, 0.9]);
-    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 150, 0.22]));
+    // Rest lengths are what "packed" means here: an edge pulls its ends to this
+    // distance and no closer, so longer edges mean more air between the cards.
+    const links = dep.edges.map((e) => [e.src, e.dst, 282, 0.9]);
+    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 180, 0.22]));
 
     const nodes = dep.seats.map((s, i) => {
       const r = seedOf(s.role);
@@ -157,7 +159,10 @@
     const springs = links.map(([a, b, len, k]) => [by[a], by[b], len, k])
       .filter((l) => l[0] && l[1]);
 
-    const REP = 380000, DAMP = 0.82, STEPS = 420;
+    // Repulsion and the pull to the middle are what actually set the spacing:
+    // the springs only decide which side of it a pair settles on. More push and
+    // less pull is what opens the graph out.
+    const REP = 505000, DAMP = 0.82, STEPS = 420;
     // The panel is wider than it is tall, so the graph is laid out wider than it
     // is tall too: vertical repulsion is damped and the separation pass below is
     // what stops the cards piling up. A square blob in a wide panel is what made
@@ -189,7 +194,7 @@
 
       nodes.forEach((n) => {
         // Irina is held near the middle; everyone else only drifts back.
-        const pull = n.ring === 0 ? 0.14 : 0.035;
+        const pull = n.ring === 0 ? 0.14 : 0.024;
         n.vx -= n.x * pull; n.vy -= n.y * pull;
         n.x += n.vx * cool; n.y += n.vy * cool;
         n.vx *= DAMP; n.vy *= DAMP;
@@ -201,8 +206,8 @@
           for (let j = i + 1; j < nodes.length; j += 1) {
             const a = nodes[i], b = nodes[j];
             const dx = b.x - a.x, dy = b.y - a.y;
-            const ox = (a.w + b.w) / 2 + 14 - Math.abs(dx);
-            const oy = (a.h + b.h) / 2 + 14 - Math.abs(dy);
+            const ox = (a.w + b.w) / 2 + 20 - Math.abs(dx);
+            const oy = (a.h + b.h) / 2 + 20 - Math.abs(dy);
             if (ox <= 0 || oy <= 0) continue;
             if (ox < oy) {
               const s = (dx >= 0 ? 1 : -1) * ox * 0.5;
