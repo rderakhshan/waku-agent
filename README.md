@@ -92,8 +92,9 @@ uv run waku dashboard                   # Waku's own cockpit → localhost:7777
 ```
 
 Irina's dashboard **is** that cockpit — the same panels, the same `state.db` shape — pointed at
-her and extended with a Department view. `localhost:7777` is Waku; `localhost:7778` is Irina.
-Comparing the two is the quickest way to see what this repository adds.
+her, with a **Home** page in front of it and a **Department** view inside it. The cockpit's own
+pages sit together under **LLMOps** in the rail. `localhost:7777` is Waku; `localhost:7778` is
+Irina. Comparing the two is the quickest way to see what this repository adds.
 
 **Waku's own walkthrough.** *"Remember that Alex prefers morning meetings."* Quit. Restart.
 *"Book a catch-up with Alex on Friday."* → it remembers, and books 9am. Waku's memory is one

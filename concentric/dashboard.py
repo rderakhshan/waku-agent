@@ -133,6 +133,7 @@ def department_payload() -> dict:
 # There is no Department rail item: the department is the second tab of the
 # Overview page (see department.js), so the rail keeps one entry for both.
 _SCRIPT = ('<script src="/theme.js"></script>\n'
+           '<script src="/home.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
 _AFTER = '<script src="/layout.js"></script>\n'
@@ -163,6 +164,38 @@ def _picker() -> str:
             '</label>\n')
 
 
+def _rail(html: str) -> str:
+    """Home above the Work Desk, and the cockpit pages under one LLMOps heading.
+
+    waku's rail has no nesting beyond its section headings, so this reuses the
+    heading it already draws rather than inventing a control. Nothing about the
+    pages themselves changes — only where the rail puts them, which is why this
+    is string surgery on the shell and not a single edit to a view.
+
+    The anchors stay DIRECT children of <nav>: `.rail > a` is what styles them, so
+    wrapping them in a container would take their look away. A heading and its
+    rows is the two-level menu the rail already speaks."""
+    # "System" held Overview and the cockpit pages; "Arena" held the two races.
+    # LLMOps replaces the first, and the races move under it.
+    html = html.replace('<div class="r-grp">System</div>', "", 1)
+    html = html.replace('<div class="r-grp">Arena</div>', "", 1)
+    # Home is new. The Work Desk keeps its own row and its monogram — it is the
+    # page both tabs live on, so it is named for the page, not for one of them.
+    html = html.replace(
+        '<a href="#overview" data-v="overview" data-short="O" aria-label="Overview">'
+        '<span class="lbl">Overview</span></a>',
+        '<a href="#home" data-v="home" data-short="H" aria-label="Home">'
+        '<span class="lbl">Home</span></a>\n  '
+        '<a href="#overview" data-v="overview" data-short="W" aria-label="Work Desk">'
+        '<span class="lbl">Work Desk</span></a>', 1)
+    # The heading takes the place of the first of its pages, so the pages keep the
+    # order they already had.
+    html = html.replace(
+        '<a href="#gateway"',
+        '<div class="r-grp">LLMOps</div>\n  <a href="#gateway"', 1)
+    return html
+
+
 def _inject(html: str) -> str:
     """Rename the shell to Irina, give it her mark, a theme picker and the
     department view. Additive and in-memory; waku's index.html is never written."""
@@ -170,14 +203,7 @@ def _inject(html: str) -> str:
     html = html.replace('href="/static/waku-mark.svg"', 'href="/irina-mark.svg"', 1)
     html = html.replace('<span class="r-name">WAKU</span>',
                         '<span class="r-name">IRINA</span>', 1)
-    # The first rail entry is the page both tabs live on, so it is named for the
-    # page rather than for one of its tabs. Its monogram follows, and the
-    # aria-label is what the collapsed rail shows as a tooltip.
-    html = html.replace(
-        '<a href="#overview" data-v="overview" data-short="O" aria-label="Overview">'
-        '<span class="lbl">Overview</span></a>',
-        '<a href="#overview" data-v="overview" data-short="W" aria-label="Work Desk">'
-        '<span class="lbl">Work Desk</span></a>', 1)
+    html = _rail(html)
     # The head's initial text, before the router writes it. Without this the page
     # flashes "Overview" for the first frame.
     html = html.replace('<h1 id="title">Overview</h1>',
@@ -204,6 +230,10 @@ def _handler_class():
             path = self.path.split("?", 1)[0]
             if path == "/department.js":
                 body = (Path(__file__).parent / "static" / "department.js").read_bytes()
+                self._send(body, "text/javascript", no_cache=True)
+                return
+            if path == "/home.js":
+                body = (Path(__file__).parent / "static" / "home.js").read_bytes()
                 self._send(body, "text/javascript", no_cache=True)
                 return
             if path == "/irina-mark.svg":

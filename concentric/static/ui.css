@@ -610,3 +610,69 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---- Home: the billboard.
+   The only page here that is not a cockpit, so it is the only one allowed to
+   take up room. Everything below is built from the same theme tokens as the
+   rest, which is why it repaints correctly under all 34 themes. */
+
+.home-hero{display:flex;gap:var(--space-6);align-items:flex-start;
+  padding:var(--space-8) 0 var(--space-6);border-bottom:var(--rule-width) solid var(--rule);
+  margin-bottom:var(--space-6)}
+.home-mark{flex-shrink:0;width:76px;height:76px}
+.home-hero-body{min-width:0}
+.home-name{font-family:var(--face-display);font-size:var(--text-3xl,2.4rem);line-height:1.05;
+  letter-spacing:-0.02em;color:var(--text-ink);margin:0}
+.home-lede{font-size:var(--text-lg);line-height:var(--leading-snug);color:var(--text-ink);
+  margin:var(--space-3) 0 0;max-width:62ch}
+.home-sub{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text-faint);
+  margin:var(--space-3) 0 0;max-width:72ch}
+.home-cta{display:flex;flex-wrap:wrap;gap:var(--space-3);margin-top:var(--space-5)}
+.home-p{font-size:var(--text-base);line-height:var(--leading-relaxed);color:var(--text-faint);
+  margin:0 0 var(--space-3)}
+.home-p:last-child{margin-bottom:0}
+.home-p code{font-family:var(--face-mono);font-size:0.92em;color:var(--text-ink)}
+
+/* Cards: four across on a wide screen, one on a narrow one. */
+.home-grid{display:grid;gap:var(--space-4);margin-bottom:var(--space-6);
+  grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.home-grid-2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+
+/* The three rings. The number is the anchor; the roles are the evidence. */
+.home-ring{display:flex;gap:var(--space-4);padding:var(--space-4) 0;
+  border-top:var(--rule-width) solid var(--rule)}
+.home-ring:first-child{border-top:0;padding-top:0}
+.home-ring-n{flex-shrink:0;width:30px;height:30px;border-radius:var(--shape-circle);
+  display:grid;place-items:center;font-family:var(--face-mono);font-size:var(--text-sm);
+  background:var(--accent-soft);color:var(--accent);border:var(--rule-width) solid var(--accent)}
+.home-ring-body{min-width:0}
+.home-ring-name{font-family:var(--face-display);font-size:var(--text-base);color:var(--text-ink);
+  display:flex;align-items:baseline;gap:var(--space-2)}
+.home-ring-count{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-faint)}
+.home-ring-blurb{font-size:var(--text-sm);color:var(--text-faint);margin-top:2px}
+.home-ring-roles{display:flex;flex-wrap:wrap;gap:6px;margin-top:var(--space-3)}
+.home-ring-roles code{font-family:var(--face-mono);font-size:var(--text-xs);
+  padding:2px 7px;border-radius:var(--radius-sm,4px);background:var(--surface-raised);
+  border:var(--rule-width) solid var(--rule);color:var(--text-faint)}
+
+/* The loop, drawn as the four stages every seat runs. */
+.home-loop{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2);
+  margin-bottom:var(--space-4)}
+.home-stage{display:flex;flex-direction:column;align-items:center;gap:1px;
+  padding:var(--space-3) var(--space-4);border-radius:var(--radius);
+  background:var(--surface-raised);border:var(--rule-width) solid var(--rule);min-width:74px}
+.home-stage b{font-family:var(--face-mono);font-size:var(--text-sm);color:var(--text-ink);
+  font-weight:var(--font-weight-medium)}
+.home-stage span{font-size:var(--text-xs);color:var(--text-faint)}
+.home-loop i{color:var(--text-faint);font-style:normal}
+
+@media (max-width:720px){
+  .home-hero{flex-direction:column;gap:var(--space-4)}
+  .home-name{font-size:var(--text-2xl,1.9rem)}
+}
+
+/* The two-card row pairs a tall card (the rings) with a short one (the loop).
+   Without this the short one stretches to match and carries a field of empty
+   space; the grid stretches by default. */
+.home-grid-2{align-items:start}
+.home-grid-2 .home-stage{min-width:64px;padding:var(--space-2) var(--space-3)}
