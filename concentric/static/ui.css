@@ -31,6 +31,27 @@
                 0 6px 18px -6px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
+/* ── 1b. the type scale, one step up ────────────────────────────────────────
+   waku's scale is 12 / 13 / 15 px for everything you actually read, which is
+   small on a laptop and smaller still on a wide screen. Every reading size goes
+   up about a fifth. The two display sizes go up less: a heading that grows as
+   fast as the label under it stops being a heading.
+
+   --text-xs carries 84 places on its own, so this one block is most of the
+   change. Nothing here alters a layout — only how large the text in it is.
+
+   The px sizes hardcoded inside the architecture SVG and the scatter chart are
+   deliberately NOT touched. They are drawn into a fixed viewBox, and text that
+   grows inside a fixed box overflows it. */
+:root {
+  --text-xs: 14px;     /* was 12 — labels, meta, badges, counters */
+  --text-sm: 15.5px;   /* was 13 — the body size */
+  --text-base: 18px;   /* was 15 */
+  --text-lg: 23px;     /* was 20 — the page title */
+  --text-xl: 31px;     /* was 27 */
+  --text-2xl: 41px;    /* was 36 */
+}
+
 /* ── 2. the ground ──────────────────────────────────────────────────────────
    Two very soft accent blooms behind everything, so the page is not one flat
    fill. Fixed, so it does not scroll or shimmer. */
