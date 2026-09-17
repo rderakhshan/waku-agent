@@ -34,3 +34,38 @@
     localStorage.setItem("dockW", String(dockMax()));
   }
 })();
+
+// Stop the 5s refresh throwing the reader back to the top of the page.
+//
+// render() rebuilds #view's innerHTML, which collapses <main> for an instant and
+// takes the scroll position down with it. waku knows this — it saves and restores
+// main.scrollTop for the views it rebuilds in place (main.js:56, "Rebuilding #view
+// innerHTML resets the scroll"). But the branch that handles "overview" and
+// "graph" has no such guard, and the department graph lives in overview. So every
+// poll jumped the page to the top.
+//
+// Same save and restore, wrapped around render() rather than edited into it.
+// Only for a same-page refresh: the hash is what separates a poll from a
+// navigation, and a navigation should land at the top.
+//
+// Both scroll containers are covered. <main> scrolls on a wide screen
+// (style.css: height:100vh; overflow-y:auto), the document scrolls on a narrow
+// one (the same rule drops to height:auto). Preserving the wrong one is free.
+//
+// This file runs after main.js, so render exists. The hashchange listener main.js
+// registered keeps the ORIGINAL render — which is what we want, since navigation
+// is exactly the case that should not preserve the scroll.
+(function () {
+  if (typeof render !== "function") return;
+  const base = render;
+  render = function () {
+    const main = document.querySelector("main");
+    const hash = location.hash;
+    const y = main ? main.scrollTop : 0;
+    const winY = window.scrollY;
+    base();
+    if (location.hash !== hash) return;   // a navigation, not a refresh
+    if (main) main.scrollTop = y;
+    window.scrollTo(0, winY);
+  };
+})();
