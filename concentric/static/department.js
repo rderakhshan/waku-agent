@@ -116,6 +116,22 @@
   /* archSVG's root is styled width:100% for the Overview page, where it fills
      the column. Nested inside a card it has to take the size it was given. */
   .dep-inner{width:auto;min-width:0;height:auto}
+  /* The mechanism beats while a step is working, the way the department's own
+     cards do.
+     waku HOLDS .hot rather than pulsing it — its comment says four boxes in one
+     wave lighting together is the point — and on the Single Agent page that is
+     right. Inside an open card the reader is watching one seat, so a beat says
+     "working" more clearly than an outline that merely sits there.
+     Softer than the card's beat: these boxes are 200px wide, not 250, and 1.18
+     on one of them throws the chart around. Only the rect scales, so the label
+     inside stays crisp. */
+  .dep-open .arch .node.hot .bx,
+  .dep-open .arch .gate.hot{
+    transform-box:fill-box;
+    transform-origin:center;
+    animation:dep-beat-soft .62s ease-in-out infinite;
+  }
+  @keyframes dep-beat-soft{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
   .dep-seat-name{font-size:var(--text-lg);font-weight:600;letter-spacing:-0.01em;
     line-height:var(--leading-snug);margin-bottom:var(--space-2)}
   .dep-kvs{display:flex;flex-wrap:wrap;gap:var(--space-6);margin-top:var(--space-4)}
