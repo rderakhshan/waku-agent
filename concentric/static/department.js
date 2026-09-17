@@ -90,6 +90,15 @@
   .dep-legend{display:flex;gap:var(--space-4);flex-wrap:wrap;margin-top:var(--space-3)}
   .dep-key{display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--muted,#5a6b80)}
   .dep-swatch{width:14px;height:10px;border-radius:3px;border:1.3px solid var(--border,#2e6db4)}
+  .dep-seat-head{padding-bottom:var(--space-4);margin-bottom:var(--space-4);
+    border-bottom:var(--rule-width) solid var(--rule)}
+  .dep-seat-name{font-size:var(--text-lg);font-weight:600;letter-spacing:-0.01em;
+    line-height:var(--leading-snug);margin-bottom:var(--space-2)}
+  .dep-kvs{display:flex;flex-wrap:wrap;gap:var(--space-6);margin-top:var(--space-4)}
+  .dep-kv{display:flex;flex-direction:column;gap:3px;min-width:0}
+  .dep-kv span{font-family:var(--face-mono);font-size:var(--text-xs);text-transform:uppercase;
+    letter-spacing:var(--tracking-label);color:var(--text-faint)}
+  .dep-kv b{font-weight:500;color:var(--text-ink)}
   @keyframes dep-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
   `;
 
@@ -329,6 +338,75 @@
     paintView(svg);
   }
 
+  // ---- clicking a seat opens its architecture.
+  //
+  // The chart is waku's own archSVG — the same function the Single Agent tab
+  // draws — so this is that chart, not a copy of it. Only one is ever in the
+  // DOM, and that is what makes it work: archSVG's boxes share data-node names
+  // and its animation selects them globally, so two copies would light each
+  // other. One at a time, and the ids are unique again.
+  //
+  // The picture is identical for every seat, because every seat is a Waku. What
+  // is NOT identical is the header above it — this seat's own tools, memory and
+  // spend — which is what makes the dialog about this seat rather than about the
+  // architecture in general.
+  let latest = null;
+  // Captured ONCE, at load. Taking the base at open time instead means a second
+  // dialog captures the first dialog's patch, and the two never fully unwind.
+  // diagram.js loads before this file and owns animateStage; the guard is for a
+  // page where it did not, so the dialog simply does not animate rather than
+  // failing to open.
+  const stageBase = typeof animateStage === "function" ? animateStage : null;
+
+  function seatFacts(seat, d) {
+    const db = ((d.db && d.db.seats) || []).find((r) => r.seat === seat.role) || {};
+    const use = ((d.usage && d.usage.by_seat) || []).find((r) => r.seat === seat.role) || {};
+    return {
+      tools: (seat.tools || []).join(", ") || "none",
+      memory: `${db.facts || 0} facts · ${db.episodes || 0} episodes · ${kb(db.size || 0)}`,
+      spend: `${use.calls || 0} calls · ${money(use.cost || 0)}`,
+    };
+  }
+
+  function seatHead(seat, d) {
+    const f = seatFacts(seat, d);
+    const kv = (k, v) => `<div class="dep-kv"><span>${k}</span><b>${v}</b></div>`;
+    return `<div class="dep-seat-head">
+      <div class="dep-seat-name">${esc(seat.title)}</div>
+      <div class="meta">${esc(seat.role)} &middot; ring ${seat.ring} &middot; ${
+        seat.built ? "has run" : "never used"}</div>
+      <div class="dep-kvs">
+        ${kv("tools", esc(f.tools))}
+        ${kv("memory", esc(f.memory))}
+        ${kv("spend", esc(f.spend))}
+      </div></div>`;
+  }
+
+  function openSeat(role) {
+    const d = latest;
+    if (!d || !d.department || typeof openDialog !== "function") return;
+    const seat = d.department.seats.find((s) => s.role === role);
+    if (!seat) return;
+    const dlg = openDialog(seatHead(seat, d) + archSVG(d),
+                           { wide: true, label: seat.title });
+
+    // archSVG's boxes navigate by hash (location.hash='memory/overview'). In a
+    // dialog that would move the page BEHIND it, so the dialog steps aside.
+    dlg.addEventListener("click", (e) => {
+      if (e.target && e.target.closest && e.target.closest("svg")) dlg.close();
+    });
+
+    // The chart's animation selects its boxes globally, so it would light for
+    // any seat's events. While this dialog is open, only this seat's get through.
+    if (stageBase) {
+      const mine = (ev) => { if (ev && ev.role === role) stageBase(ev); };
+      animateStage = mine;
+      dlg.addEventListener("close", () => {
+        if (animateStage === mine) animateStage = stageBase;
+      });
+    }
+  }
+
   function attachZoom(svg, nodes) {
     if (!svg) return;
     if (!view) fit(svg, nodes);
@@ -342,9 +420,11 @@
     }, { passive: false });
 
     let drag = null;
+    let downAt = null;
     svg.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       drag = { x: e.clientX, y: e.clientY };
+      downAt = { x: e.clientX, y: e.clientY };
       svg.classList.add("panning");
       svg.setPointerCapture(e.pointerId);
     });
@@ -356,10 +436,16 @@
       drag = { x: e.clientX, y: e.clientY };
       paintView(svg);
     });
+    // A pointerup is a click only if the pointer barely moved — otherwise every
+    // pan would open whatever seat the drag happened to end on.
     const stop = (e) => {
+      const moved = downAt ? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) : 999;
+      const node = e.target && e.target.closest ? e.target.closest(".dep-node") : null;
       drag = null;
+      downAt = null;
       svg.classList.remove("panning");
       try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+      if (moved < 5 && node) openSeat(node.getAttribute("data-seat"));
     };
     svg.addEventListener("pointerup", stop);
     svg.addEventListener("pointercancel", stop);
@@ -367,8 +453,8 @@
 
   function zoomBar() {
     return `<div class="dep-bar">
-      <span class="dep-hint">drag to pan &middot; scroll to zoom &middot; click a seat to
-        open its panel</span>
+      <span class="dep-hint">drag to pan &middot; scroll to zoom &middot; click a seat for
+        its architecture</span>
       <div class="dep-zoom">
         <button type="button" data-zoom="in" title="Zoom in">+</button>
         <button type="button" data-zoom="out" title="Zoom out">-</button>
@@ -569,6 +655,7 @@
 
   VIEWS.department = (d) => {
     const dep = d.department;
+    latest = d;
     const head = `<div class="meta" style="margin-bottom:var(--space-3)">Twenty-four seats on
       waku, laid out by force rather than by hand: nodes push each other apart, edges pull their
       ends together, and the teams cluster because their edges are denser. Every seat is a full
