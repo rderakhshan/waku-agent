@@ -692,9 +692,13 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
   border-bottom:3.5px solid transparent;
   transform:rotate(90deg);transition:transform 140ms ease}
 .r-fold[aria-expanded="false"] .r-caret{transform:rotate(0)}
-/* Closed: the pages it holds are gone. A page you are ON is never left hidden;
-   layout.js opens the fold when you arrive at one. */
-#nav[data-llmops="closed"] a[data-grp="llmops"]{display:none}
+/* Closed: the pages it holds are gone. Keyed off the fold's own aria-expanded,
+   which is in the markup, so they are hidden on the FIRST paint rather than a
+   moment after layout.js runs. The anchors are siblings of the fold row, which
+   is what lets a sibling combinator reach them with no wrapper between.
+   A page you are ON is never left hidden; layout.js opens the fold on arrival. */
+.r-fold[aria-expanded="false"] ~ a[data-grp="llmops"]{display:none}
 /* Icon-only rail: no room for a fold control, so show them as monograms, which
-   is all a collapsed rail shows anyway. */
+   is all a collapsed rail shows anyway. Same specificity as the rule above, so
+   this one has to come second. */
 .rail.collapsed a[data-grp="llmops"]{display:flex}

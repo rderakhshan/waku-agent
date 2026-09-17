@@ -82,8 +82,7 @@
 // class on the anchors, and hiding an anchor does not stop that.
 (function () {
   const fold = document.getElementById("llmops");
-  const nav = document.getElementById("nav");
-  if (!fold || !nav) return;
+  if (!fold) return;
 
   // The pages the fold holds. Arriving at one must never leave it hidden behind
   // a closed fold, so these open it.
@@ -91,20 +90,23 @@
                           "database", "ops", "compare"]);
   const KEY = "llmopsOpen";
 
+  // aria-expanded IS the state — the stylesheet hides the pages off it, so
+  // setting the attribute is the whole change.
+  function set(open) {
+    fold.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+
+  // The reader's own choice, in memory as well as in storage: reveal() needs to
+  // put the rail back the way they left it.
+  let pref = false;
+  try { pref = localStorage.getItem(KEY) === "1"; } catch (e) { /* private mode */ }
+  set(pref);   // closed until the reader says otherwise
+
   function store(open) {
+    pref = open;
     try { localStorage.setItem(KEY, open ? "1" : "0"); }
     catch (e) { /* private mode: the fold simply will not remember */ }
   }
-
-  // Setting the attribute IS the change — the stylesheet does the hiding.
-  function set(open) {
-    fold.setAttribute("aria-expanded", open ? "true" : "false");
-    nav.dataset.llmops = open ? "open" : "closed";
-  }
-
-  let saved = null;
-  try { saved = localStorage.getItem(KEY); } catch (e) { /* private mode */ }
-  set(saved !== "0");   // open unless the reader closed it
 
   function toggle() {
     const open = fold.getAttribute("aria-expanded") !== "true";
@@ -117,9 +119,14 @@
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
   });
 
+  // The fold follows where you are: forced open on a page it holds, so a page is
+  // never hidden behind a closed fold, and otherwise put back to the reader's own
+  // choice. Arriving somewhere is not itself a preference — opening on arrival is
+  // deliberately not stored, or one visit to Memory would un-shorten the rail for
+  // good. Only a click is.
   const reveal = () => {
     const view = (location.hash || "").slice(1).split("/")[0];
-    if (INSIDE.has(view)) { set(true); store(true); }
+    set(INSIDE.has(view) ? true : pref);
   };
   reveal();
   window.addEventListener("hashchange", reveal);

@@ -198,11 +198,13 @@ def _rail(html: str) -> str:
         '<span class="lbl">Work Desk</span></a>', 1)
     # The fold takes the place of the first of its pages, so the pages keep the
     # order they already had. aria-expanded is the single source of state — the
-    # stylesheet and layout.js read it rather than keeping a second copy.
+    # stylesheet hides the pages off it, so they are hidden on the FIRST paint
+    # rather than after layout.js runs, and there is no second copy to drift.
+    # It ships closed: the point of the fold is a short rail.
     html = html.replace(
         '<a href="#gateway"',
         '<div class="r-grp r-fold" id="llmops" role="button" tabindex="0" '
-        'aria-expanded="true" aria-controls="nav">LLMOps'
+        'aria-expanded="false" aria-controls="nav">LLMOps'
         '<i class="r-fold-rule" aria-hidden="true"></i>'
         '<i class="r-caret" aria-hidden="true"></i></div>\n  '
         '<a data-grp="llmops" href="#gateway"', 1)
