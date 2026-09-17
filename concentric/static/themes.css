@@ -1,13 +1,17 @@
 /* Irina's dashboard — the theme layer. GENERATED, do not edit by hand.
  *
- * Source: the opencode palettes vendored by Irina's CLI
- * (irina/cli/themes/*.json). Regenerate with:
+ * Sources:
+ *   - the opencode palettes Irina's CLI vendors (irina/cli/themes/*.json)
+ *   - concentric/themes/*.json, this repository's own (Materio lives there)
+ *
+ * Regenerate with:
  *
  *     python -m concentric.make_themes <path to irina/cli/themes>
  *
- * Each block maps Irina's semantic tokens onto the tokens waku's
- * dashboard reads. Colour only — layout, spacing and motion live in
- * ui.css, and the default (no data-irina-theme) is waku's own palette.
+ * Each block maps a theme's semantic tokens onto the tokens waku's
+ * dashboard reads. Colour, plus anything a local theme puts in its
+ * `irina` block (radius, shadows). The default — no data-irina-theme —
+ * is waku's own palette.
  */
 
 [data-irina-theme="aura"] {
@@ -166,6 +170,58 @@
   --chart-5: color-mix(in srgb, #0043ce 24%, #ffffff);
 }
 
+[data-irina-theme="catppuccin"] {
+  --surface-bg: #1e1e2e;
+  --surface-paper: #181825;
+  --surface-raised: #11111b;
+  --text-ink: #cdd6f4;
+  --text-muted: #9399b2;
+  --rule: #313244;
+  --rule-hard: #45475a;
+  --accent: #89b4fa;
+  --accent-fg: #89b4fa;
+  --ok: #a6e3a1;
+  --warn: #f9e2af;
+  --bad: #f38ba8;
+  --surface-sunk: color-mix(in srgb, #cdd6f4 12%, #1e1e2e);
+  --text-faint: color-mix(in srgb, #cdd6f4 62%, #1e1e2e);
+  --scrollbar-thumb: color-mix(in srgb, #cdd6f4 25%, transparent);
+  --accent-ink: #1e1e2e;
+  --accent-hover: color-mix(in srgb, #89b4fa 88%, #cdd6f4);
+  --accent-active: color-mix(in srgb, #89b4fa 78%, #cdd6f4);
+  --chart-1: #89b4fa;
+  --chart-2: color-mix(in srgb, #89b4fa 78%, #1e1e2e);
+  --chart-3: color-mix(in srgb, #89b4fa 58%, #1e1e2e);
+  --chart-4: color-mix(in srgb, #89b4fa 40%, #1e1e2e);
+  --chart-5: color-mix(in srgb, #89b4fa 24%, #1e1e2e);
+}
+
+[data-theme="light"][data-irina-theme="catppuccin"] {
+  --surface-bg: #eff1f5;
+  --surface-paper: #e6e9ef;
+  --surface-raised: #dce0e8;
+  --text-ink: #4c4f69;
+  --text-muted: #7c7f93;
+  --rule: #ccd0da;
+  --rule-hard: #bcc0cc;
+  --accent: #1e66f5;
+  --accent-fg: #1e66f5;
+  --ok: #40a02b;
+  --warn: #df8e1d;
+  --bad: #d20f39;
+  --surface-sunk: color-mix(in srgb, #4c4f69 12%, #eff1f5);
+  --text-faint: color-mix(in srgb, #4c4f69 62%, #eff1f5);
+  --scrollbar-thumb: color-mix(in srgb, #4c4f69 25%, transparent);
+  --accent-ink: #eff1f5;
+  --accent-hover: color-mix(in srgb, #1e66f5 88%, #4c4f69);
+  --accent-active: color-mix(in srgb, #1e66f5 78%, #4c4f69);
+  --chart-1: #1e66f5;
+  --chart-2: color-mix(in srgb, #1e66f5 78%, #eff1f5);
+  --chart-3: color-mix(in srgb, #1e66f5 58%, #eff1f5);
+  --chart-4: color-mix(in srgb, #1e66f5 40%, #eff1f5);
+  --chart-5: color-mix(in srgb, #1e66f5 24%, #eff1f5);
+}
+
 [data-irina-theme="catppuccin-frappe"] {
   --surface-bg: #303446;
   --surface-paper: #292c3c;
@@ -268,58 +324,6 @@
   --chart-3: color-mix(in srgb, #8aadf4 58%, #24273a);
   --chart-4: color-mix(in srgb, #8aadf4 40%, #24273a);
   --chart-5: color-mix(in srgb, #8aadf4 24%, #24273a);
-}
-
-[data-irina-theme="catppuccin"] {
-  --surface-bg: #1e1e2e;
-  --surface-paper: #181825;
-  --surface-raised: #11111b;
-  --text-ink: #cdd6f4;
-  --text-muted: #9399b2;
-  --rule: #313244;
-  --rule-hard: #45475a;
-  --accent: #89b4fa;
-  --accent-fg: #89b4fa;
-  --ok: #a6e3a1;
-  --warn: #f9e2af;
-  --bad: #f38ba8;
-  --surface-sunk: color-mix(in srgb, #cdd6f4 12%, #1e1e2e);
-  --text-faint: color-mix(in srgb, #cdd6f4 62%, #1e1e2e);
-  --scrollbar-thumb: color-mix(in srgb, #cdd6f4 25%, transparent);
-  --accent-ink: #1e1e2e;
-  --accent-hover: color-mix(in srgb, #89b4fa 88%, #cdd6f4);
-  --accent-active: color-mix(in srgb, #89b4fa 78%, #cdd6f4);
-  --chart-1: #89b4fa;
-  --chart-2: color-mix(in srgb, #89b4fa 78%, #1e1e2e);
-  --chart-3: color-mix(in srgb, #89b4fa 58%, #1e1e2e);
-  --chart-4: color-mix(in srgb, #89b4fa 40%, #1e1e2e);
-  --chart-5: color-mix(in srgb, #89b4fa 24%, #1e1e2e);
-}
-
-[data-theme="light"][data-irina-theme="catppuccin"] {
-  --surface-bg: #eff1f5;
-  --surface-paper: #e6e9ef;
-  --surface-raised: #dce0e8;
-  --text-ink: #4c4f69;
-  --text-muted: #7c7f93;
-  --rule: #ccd0da;
-  --rule-hard: #bcc0cc;
-  --accent: #1e66f5;
-  --accent-fg: #1e66f5;
-  --ok: #40a02b;
-  --warn: #df8e1d;
-  --bad: #d20f39;
-  --surface-sunk: color-mix(in srgb, #4c4f69 12%, #eff1f5);
-  --text-faint: color-mix(in srgb, #4c4f69 62%, #eff1f5);
-  --scrollbar-thumb: color-mix(in srgb, #4c4f69 25%, transparent);
-  --accent-ink: #eff1f5;
-  --accent-hover: color-mix(in srgb, #1e66f5 88%, #4c4f69);
-  --accent-active: color-mix(in srgb, #1e66f5 78%, #4c4f69);
-  --chart-1: #1e66f5;
-  --chart-2: color-mix(in srgb, #1e66f5 78%, #eff1f5);
-  --chart-3: color-mix(in srgb, #1e66f5 58%, #eff1f5);
-  --chart-4: color-mix(in srgb, #1e66f5 40%, #eff1f5);
-  --chart-5: color-mix(in srgb, #1e66f5 24%, #eff1f5);
 }
 
 [data-irina-theme="cobalt2"] {
@@ -812,6 +816,66 @@
   --chart-3: color-mix(in srgb, #6182b8 58%, #fafafa);
   --chart-4: color-mix(in srgb, #6182b8 40%, #fafafa);
   --chart-5: color-mix(in srgb, #6182b8 24%, #fafafa);
+}
+
+[data-irina-theme="materio"] {
+  --surface-bg: #28243d;
+  --surface-paper: #312d4b;
+  --surface-raised: #3a3555;
+  --text-ink: #e7e3fc;
+  --text-muted: #aaaac3;
+  --rule: #3f3b54;
+  --rule-hard: #5e5878;
+  --accent: #8c57ff;
+  --accent-fg: #8c57ff;
+  --ok: #56ca00;
+  --warn: #ffb400;
+  --bad: #ff4c51;
+  --surface-sunk: color-mix(in srgb, #e7e3fc 12%, #28243d);
+  --text-faint: color-mix(in srgb, #e7e3fc 62%, #28243d);
+  --scrollbar-thumb: color-mix(in srgb, #e7e3fc 25%, transparent);
+  --accent-ink: #28243d;
+  --accent-hover: color-mix(in srgb, #8c57ff 88%, #e7e3fc);
+  --accent-active: color-mix(in srgb, #8c57ff 78%, #e7e3fc);
+  --chart-1: #8c57ff;
+  --chart-2: color-mix(in srgb, #8c57ff 78%, #28243d);
+  --chart-3: color-mix(in srgb, #8c57ff 58%, #28243d);
+  --chart-4: color-mix(in srgb, #8c57ff 40%, #28243d);
+  --chart-5: color-mix(in srgb, #8c57ff 24%, #28243d);
+  --radius: 6px;
+  --shadow-sm: 0 2px 4px rgb(46 38 61 / 0.16);
+  --shadow-md: 0 4px 10px rgb(46 38 61 / 0.20);
+  --shadow-lg: 0 6px 16px rgb(46 38 61 / 0.22);
+}
+
+[data-theme="light"][data-irina-theme="materio"] {
+  --surface-bg: #f4f5fa;
+  --surface-paper: #ffffff;
+  --surface-raised: #f7f7fb;
+  --text-ink: #2e263d;
+  --text-muted: #696476;
+  --rule: #dcdce3;
+  --rule-hard: #c3c3d0;
+  --accent: #8c57ff;
+  --accent-fg: #8c57ff;
+  --ok: #56ca00;
+  --warn: #ffb400;
+  --bad: #ff4c51;
+  --surface-sunk: color-mix(in srgb, #2e263d 12%, #f4f5fa);
+  --text-faint: color-mix(in srgb, #2e263d 62%, #f4f5fa);
+  --scrollbar-thumb: color-mix(in srgb, #2e263d 25%, transparent);
+  --accent-ink: #f4f5fa;
+  --accent-hover: color-mix(in srgb, #8c57ff 88%, #2e263d);
+  --accent-active: color-mix(in srgb, #8c57ff 78%, #2e263d);
+  --chart-1: #8c57ff;
+  --chart-2: color-mix(in srgb, #8c57ff 78%, #f4f5fa);
+  --chart-3: color-mix(in srgb, #8c57ff 58%, #f4f5fa);
+  --chart-4: color-mix(in srgb, #8c57ff 40%, #f4f5fa);
+  --chart-5: color-mix(in srgb, #8c57ff 24%, #f4f5fa);
+  --radius: 6px;
+  --shadow-sm: 0 2px 4px rgb(46 38 61 / 0.16);
+  --shadow-md: 0 4px 10px rgb(46 38 61 / 0.20);
+  --shadow-lg: 0 6px 16px rgb(46 38 61 / 0.22);
 }
 
 [data-irina-theme="matrix"] {
@@ -1699,5 +1763,5 @@
 }
 
 /* The selector's options, so theme.js and this file cannot disagree. */
-:root { --irina-theme-count: 33; }
-/* aura ayu carbonfox catppuccin-frappe catppuccin-macchiato catppuccin cobalt2 cursor dracula everforest flexoki github gruvbox kanagawa lucent-orng material matrix mercury monokai nightowl nord one-dark opencode orng osaka-jade palenight rosepine solarized synthwave84 tokyonight vercel vesper zenburn */
+:root { --irina-theme-count: 34; }
+/* aura ayu carbonfox catppuccin catppuccin-frappe catppuccin-macchiato cobalt2 cursor dracula everforest flexoki github gruvbox kanagawa lucent-orng material materio matrix mercury monokai nightowl nord one-dark opencode orng osaka-jade palenight rosepine solarized synthwave84 tokyonight vercel vesper zenburn */

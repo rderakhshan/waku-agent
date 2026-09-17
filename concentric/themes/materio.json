@@ -1,0 +1,54 @@
+{
+  "_comment": "Materio (themeselection/materio-mui-nextjs-admin-template-free, MIT) as an Irina theme. Its stack is Next.js + MUI + Tailwind, which this dashboard cannot use - it is no-build and framework-free by design - so what is taken is the design language: the palette, the radius and the shadows, read out of the template's own theme source (@core/theme/colorSchemes.ts, index.ts, customShadows.ts) and re-expressed here in the schema the other themes use.",
+  "_source": "https://github.com/themeselection/materio-mui-nextjs-admin-template-free",
+  "defs": {
+    "primary": "#8C57FF",
+    "primaryLight": "#A379FF",
+    "primaryDark": "#7E4EE6",
+    "secondary": "#8A8D93",
+    "error": "#FF4C51",
+    "warning": "#FFB400",
+    "info": "#16B1FF",
+    "success": "#56CA00",
+
+    "lightBg": "#F4F5FA",
+    "lightPaper": "#FFFFFF",
+    "lightElement": "#F7F7FB",
+    "lightInk": "#2E263D",
+    "lightMuted": "#696476",
+    "lightBorder": "#DCDCE3",
+    "lightBorderActive": "#C3C3D0",
+
+    "darkBg": "#28243D",
+    "darkPaper": "#312D4B",
+    "darkElement": "#3A3555",
+    "darkInk": "#E7E3FC",
+    "darkMuted": "#AAAAC3",
+    "darkBorder": "#3F3B54",
+    "darkBorderActive": "#5E5878"
+  },
+  "theme": {
+    "primary": "primary",
+    "secondary": "secondary",
+    "accent": "primary",
+    "error": "error",
+    "warning": "warning",
+    "success": "success",
+    "info": "info",
+    "text": { "light": "lightInk", "dark": "darkInk" },
+    "textMuted": { "light": "lightMuted", "dark": "darkMuted" },
+    "background": { "light": "lightBg", "dark": "darkBg" },
+    "backgroundPanel": { "light": "lightPaper", "dark": "darkPaper" },
+    "backgroundElement": { "light": "lightElement", "dark": "darkElement" },
+    "border": { "light": "lightBorder", "dark": "darkBorder" },
+    "borderActive": { "light": "lightBorderActive", "dark": "darkBorderActive" },
+    "borderSubtle": { "light": "lightBorder", "dark": "darkBorder" }
+  },
+  "irina": {
+    "_comment": "Shape and elevation. The opencode schema has no room for these, so a local theme may carry them here and the generator writes them out as-is. Materio's own numbers: borderRadius 6, and customShadows xs/sm/md/lg/xl.",
+    "radius": "6px",
+    "shadow-sm": "0 2px 4px rgb(46 38 61 / 0.16)",
+    "shadow-md": "0 4px 10px rgb(46 38 61 / 0.20)",
+    "shadow-lg": "0 6px 16px rgb(46 38 61 / 0.22)"
+  }
+}

@@ -78,8 +78,9 @@ def resolve_theme(data: dict, mode: str) -> dict[str, str]:
     return out
 
 
-def _block(selector: str, tokens: dict[str, str]) -> list[str]:
-    if not tokens:
+def _block(selector: str, tokens: dict[str, str],
+           extras: dict[str, str] | None = None) -> list[str]:
+    if not tokens and not extras:
         return []
     lines = [f"{selector} {{"]
     for name, value in tokens.items():
@@ -102,41 +103,57 @@ def _block(selector: str, tokens: dict[str, str]) -> list[str]:
         lines.append(f"  --chart-1: {accent};")
         for step, pct in ((2, 78), (3, 58), (4, 40), (5, 24)):
             lines.append(f"  --chart-{step}: color-mix(in srgb, {accent} {pct}%, {bg});")
+    # A local theme's own shape and elevation, written out verbatim.
+    for name, value in (extras or {}).items():
+        lines.append(f"  --{name}: {value};")
     lines.append("}")
     return lines
 
 
 def build(source: Path) -> str:
-    files = sorted(source.glob("*.json"))
+    """Every theme from `source` (the vendored opencode set) and from
+    concentric/themes/ (ours). Local names win, so a theme can be corrected here
+    without touching the vendored files."""
+    local = Path(__file__).resolve().parent / "themes"
+    files: dict[str, Path] = {}
+    for folder in (source, local):
+        if folder.is_dir():
+            for path in sorted(folder.glob("*.json")):
+                files[path.stem] = path      # the later folder wins on a name clash
     if not files:
-        raise SystemExit(f"no theme JSON files under {source}")
+        raise SystemExit(f"no theme JSON files under {source} or {local}")
 
     out = [
         "/* Irina's dashboard — the theme layer. GENERATED, do not edit by hand.",
         " *",
-        " * Source: the opencode palettes vendored by Irina's CLI",
-        " * (irina/cli/themes/*.json). Regenerate with:",
+        " * Sources:",
+        " *   - the opencode palettes Irina's CLI vendors (irina/cli/themes/*.json)",
+        " *   - concentric/themes/*.json, this repository's own (Materio lives there)",
+        " *",
+        " * Regenerate with:",
         " *",
         " *     python -m concentric.make_themes <path to irina/cli/themes>",
         " *",
-        " * Each block maps Irina's semantic tokens onto the tokens waku's",
-        " * dashboard reads. Colour only — layout, spacing and motion live in",
-        " * ui.css, and the default (no data-irina-theme) is waku's own palette.",
+        " * Each block maps a theme's semantic tokens onto the tokens waku's",
+        " * dashboard reads. Colour, plus anything a local theme puts in its",
+        " * `irina` block (radius, shadows). The default — no data-irina-theme —",
+        " * is waku's own palette.",
         " */",
         "",
     ]
     names = []
-    for path in files:
+    for name, path in sorted(files.items()):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        name = path.stem
+        extras = {k: v for k, v in (data.get("irina") or {}).items()
+                  if not k.startswith("_")}
         for mode, selector in (
             ("dark", f'[data-irina-theme="{name}"]'),
             ("light", f'[data-theme="light"][data-irina-theme="{name}"]'),
         ):
-            out += _block(selector, resolve_theme(data, mode))
+            out += _block(selector, resolve_theme(data, mode), extras)
             out.append("")
         names.append(name)
 
