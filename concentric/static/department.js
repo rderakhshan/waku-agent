@@ -54,10 +54,10 @@
     font-family:"ING Me","Instrument Sans","Segoe UI",Helvetica,Arial,sans-serif;
     cursor:grab;touch-action:none}
   .dep.panning{cursor:grabbing}
-  .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:1.4;fill:none}
-  .dep-edge.live{stroke:var(--warn,#b36b00);stroke-width:3}
-  .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:1;stroke-dasharray:4 4;opacity:.3}
-  .dep-peer.live{stroke:var(--warn,#b36b00);stroke-width:2.6;stroke-dasharray:none;opacity:1}
+  .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:2.2;fill:none}
+  .dep-edge.live{stroke:var(--warn,#b36b00);stroke-width:4}
+  .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:1.6;stroke-dasharray:5 5;opacity:.34}
+  .dep-peer.live{stroke:var(--warn,#b36b00);stroke-width:3.4;stroke-dasharray:none;opacity:1}
   .dep-card{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.6}
   .dep-r0 .dep-card{fill:var(--accent,#1e4e8c);stroke:#0a1b3a}
   .dep-r1 .dep-card{fill:var(--accent-soft,#eaf2fb);stroke:var(--accent,#1e4e8c)}
@@ -143,8 +143,8 @@
   function simulate(dep) {
     // Rest lengths are what "packed" means here: an edge pulls its ends to this
     // distance and no closer, so longer edges mean more air between the cards.
-    const links = dep.edges.map((e) => [e.src, e.dst, 282, 0.9]);
-    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 180, 0.22]));
+    const links = dep.edges.map((e) => [e.src, e.dst, 360, 0.9]);
+    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 230, 0.22]));
 
     const nodes = dep.seats.map((s, i) => {
       const r = seedOf(s.role);
@@ -162,7 +162,7 @@
     // Repulsion and the pull to the middle are what actually set the spacing:
     // the springs only decide which side of it a pair settles on. More push and
     // less pull is what opens the graph out.
-    const REP = 505000, DAMP = 0.82, STEPS = 420;
+    const REP = 860000, DAMP = 0.82, STEPS = 420;
     // The panel is wider than it is tall, so the graph is laid out wider than it
     // is tall too: vertical repulsion is damped and the separation pass below is
     // what stops the cards piling up. A square blob in a wide panel is what made
