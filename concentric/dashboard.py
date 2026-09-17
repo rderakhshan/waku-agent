@@ -134,6 +134,8 @@ _RAIL = ('<div class="r-grp">Department</div>\n'
          'aria-label="Department"><span class="lbl">Department</span></a>\n')
 _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/department.js"></script>\n')
+# After main.js, because it re-wires the resizer main.js has just wired.
+_AFTER = '<script src="/layout.js"></script>\n'
 # The sidebar mark is a CSS mask pointing at waku's svg, so the URL lives in
 # style.css and cannot be swapped by editing markup. A later stylesheet wins at
 # equal specificity, so one rule at the end of <head> repoints it. themes.css is
@@ -172,8 +174,10 @@ def _inject(html: str) -> str:
                         _RAIL + '<div class="r-grp">System</div>', 1)
     html = html.replace('<div class="r-bottom">', _picker(), 1)
     html = html.replace("</head>", _BRAND + "</head>", 1)
-    return html.replace('<script src="/static/js/main.js"></script>',
-                        _SCRIPT + '<script src="/static/js/main.js"></script>', 1)
+    html = html.replace('<script src="/static/js/main.js"></script>',
+                        _SCRIPT + '<script src="/static/js/main.js"></script>'
+                        + _AFTER, 1)
+    return html
 
 
 def _handler_class():
@@ -206,6 +210,10 @@ def _handler_class():
                 return
             if path == "/theme.js":
                 body = (Path(__file__).parent / "static" / "theme.js").read_bytes()
+                self._send(body, "text/javascript", no_cache=True)
+                return
+            if path == "/layout.js":
+                body = (Path(__file__).parent / "static" / "layout.js").read_bytes()
                 self._send(body, "text/javascript", no_cache=True)
                 return
             if path == "/":

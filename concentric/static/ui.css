@@ -448,7 +448,18 @@ body {
 }
 .rail.collapsed .irina-theme { display: none; }
 
-/* ── 19. motion, only where it means something ──────────────────────────────
+/* ── 19. the split ──────────────────────────────────────────────────────────
+   waku holds the main view to --main-min (544px, type.css) and caps the dock's
+   drag at 680px (main.js), so on a wide screen the chat could never pass about a
+   third of the page and the replies stayed cramped.
+
+   At a fifth, either side can take 80% while the other keeps 20%. Nothing else
+   has to change for that: the row is already flex, so one shrinks as the other
+   grows, and main already carries min-width:0, so its panels reflow instead of
+   overflowing. The drag cap is the other half, and it lives in layout.js. */
+:root { --main-min: 20vw; }
+
+/* ── 20. motion, only where it means something ──────────────────────────────
    Nothing animates on load, and nothing animates on a refresh.
 
    There WAS an entrance animation here (#view > * rising and fading in). It had
