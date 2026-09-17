@@ -32,7 +32,11 @@
   const TITLE = { 0: 22.5, 1: 18, 2: 16.5 };
 
   const BEAT_MS = 1400;
-  const PAD = 60;                 // breathing room around the fitted graph
+  const PAD = 40;                 // breathing room around the fitted graph
+  // Below this scale the names stop being readable. A fit that would go under it
+  // is clamped instead: the whole graph stays a pan away, but the view the
+  // reader lands on always has legible text.
+  const MIN_SCALE = 0.62;
 
   // The four stages drawn inside every seat, left to right, each mapped to the
   // trace event that lights it — the same idea as diagram.js's STAGE map.
@@ -46,7 +50,7 @@
 
   const CSS = `
   .dep-wrap{position:relative}
-  .dep{display:block;width:100%;height:74vh;min-height:460px;
+  .dep{display:block;width:100%;height:84vh;min-height:520px;
     font-family:"ING Me","Instrument Sans","Segoe UI",Helvetica,Arial,sans-serif;
     cursor:grab;touch-action:none}
   .dep.panning{cursor:grabbing}
@@ -137,8 +141,8 @@
   let cache = { key: "", result: null };
 
   function simulate(dep) {
-    const links = dep.edges.map((e) => [e.src, e.dst, 300, 0.9]);
-    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 210, 0.22]));
+    const links = dep.edges.map((e) => [e.src, e.dst, 235, 0.9]);
+    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 150, 0.22]));
 
     const nodes = dep.seats.map((s, i) => {
       const r = seedOf(s.role);
@@ -153,7 +157,13 @@
     const springs = links.map(([a, b, len, k]) => [by[a], by[b], len, k])
       .filter((l) => l[0] && l[1]);
 
-    const REP = 900000, DAMP = 0.82, STEPS = 420;
+    const REP = 380000, DAMP = 0.82, STEPS = 420;
+    // The panel is wider than it is tall, so the graph is laid out wider than it
+    // is tall too: vertical repulsion is damped and the separation pass below is
+    // what stops the cards piling up. A square blob in a wide panel is what made
+    // the whole-graph view unreadable — fitting it meant zooming out until the
+    // names were gone.
+    const WIDE = 0.45;
     for (let step = 0; step < STEPS; step += 1) {
       const cool = 1 - step / STEPS;
 
@@ -164,7 +174,7 @@
           const d2 = dx * dx + dy * dy || 1;
           const d = Math.sqrt(d2);
           const f = REP / d2;
-          const fx = (dx / d) * f, fy = (dy / d) * f;
+          const fx = (dx / d) * f, fy = (dy / d) * f * WIDE;
           a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
         }
       }
@@ -179,7 +189,7 @@
 
       nodes.forEach((n) => {
         // Irina is held near the middle; everyone else only drifts back.
-        const pull = n.ring === 0 ? 0.09 : 0.006;
+        const pull = n.ring === 0 ? 0.14 : 0.035;
         n.vx -= n.x * pull; n.vy -= n.y * pull;
         n.x += n.vx * cool; n.y += n.vy * cool;
         n.vx *= DAMP; n.vy *= DAMP;
@@ -191,8 +201,8 @@
           for (let j = i + 1; j < nodes.length; j += 1) {
             const a = nodes[i], b = nodes[j];
             const dx = b.x - a.x, dy = b.y - a.y;
-            const ox = (a.w + b.w) / 2 + 26 - Math.abs(dx);
-            const oy = (a.h + b.h) / 2 + 26 - Math.abs(dy);
+            const ox = (a.w + b.w) / 2 + 14 - Math.abs(dx);
+            const oy = (a.h + b.h) / 2 + 14 - Math.abs(dy);
             if (ox <= 0 || oy <= 0) continue;
             if (ox < oy) {
               const s = (dx >= 0 ? 1 : -1) * ox * 0.5;
@@ -283,10 +293,20 @@
     return { x0, y0, x1, y1 };
   }
 
-  function fit(nodes) {
+  function fit(svg, nodes) {
     const b = bounds(nodes);
-    view = { x: b.x0 - PAD, y: b.y0 - PAD,
-             w: (b.x1 - b.x0) + PAD * 2, h: (b.y1 - b.y0) + PAD * 2 };
+    let w = (b.x1 - b.x0) + PAD * 2;
+    let h = (b.y1 - b.y0) + PAD * 2;
+    const box = svg && svg.getBoundingClientRect();
+    if (box && box.width && box.height) {
+      const scale = Math.min(box.width / w, box.height / h);
+      if (scale < MIN_SCALE) {
+        const k = MIN_SCALE / scale;
+        w *= k;
+        h *= k;
+      }
+    }
+    view = { x: (b.x0 + b.x1) / 2 - w / 2, y: (b.y0 + b.y1) / 2 - h / 2, w, h };
   }
 
   function paintView(svg) {
@@ -306,7 +326,7 @@
 
   function attachZoom(svg, nodes) {
     if (!svg) return;
-    if (!view) fit(nodes);
+    if (!view) fit(svg, nodes);
     paintView(svg);
 
     svg.addEventListener("wheel", (e) => {
@@ -357,7 +377,7 @@
     document.querySelectorAll(".dep-zoom button").forEach((b) => {
       b.onclick = () => {
         const how = b.getAttribute("data-zoom");
-        if (how === "fit") { fit(nodes); paintView(svg); return; }
+        if (how === "fit") { fit(svg, nodes); paintView(svg); return; }
         zoomAt(svg, how === "in" ? 1 / 1.35 : 1.35, 0.5, 0.5);
       };
     });
