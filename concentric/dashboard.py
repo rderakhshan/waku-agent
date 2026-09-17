@@ -170,6 +170,18 @@ def _inject(html: str) -> str:
     html = html.replace('href="/static/waku-mark.svg"', 'href="/irina-mark.svg"', 1)
     html = html.replace('<span class="r-name">WAKU</span>',
                         '<span class="r-name">IRINA</span>', 1)
+    # The first rail entry is the page both tabs live on, so it is named for the
+    # page rather than for one of its tabs. Its monogram follows, and the
+    # aria-label is what the collapsed rail shows as a tooltip.
+    html = html.replace(
+        '<a href="#overview" data-v="overview" data-short="O" aria-label="Overview">'
+        '<span class="lbl">Overview</span></a>',
+        '<a href="#overview" data-v="overview" data-short="W" aria-label="Work Desk">'
+        '<span class="lbl">Work Desk</span></a>', 1)
+    # The head's initial text, before the router writes it. Without this the page
+    # flashes "Overview" for the first frame.
+    html = html.replace('<h1 id="title">Overview</h1>',
+                        '<h1 id="title">Work Desk</h1>', 1)
     html = html.replace('<div class="r-bottom">', _picker(), 1)
     html = html.replace("</head>", _BRAND + "</head>", 1)
     html = html.replace('<script src="/static/js/main.js"></script>',

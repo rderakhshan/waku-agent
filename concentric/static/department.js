@@ -608,11 +608,12 @@
 
   VIEWS.overview = (d, sub) => {
     const multi = (location.hash || "").slice(1).split("/")[1] === "multi";
-    // The head is written by the router before the view runs, so the tab's name
-    // is put back after it.
+    // The head is written by the router before the view runs, so the page's own
+    // name is put back after it — the rail entry and the head say the same thing,
+    // and the tab bar is what says which mode you are in.
     setTimeout(() => {
       const title = document.getElementById("title");
-      if (title) title.textContent = multi ? "Multi Agentic" : "Single Agent";
+      if (title) title.textContent = "Work Desk";
     }, 0);
     return viewTabs(multi) + (multi ? departmentBase(d, sub) : overviewBase(d, sub));
   };
