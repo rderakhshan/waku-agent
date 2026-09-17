@@ -390,10 +390,17 @@
     const dlg = openDialog(seatHead(seat, d) + archSVG(d),
                            { wide: true, label: seat.title });
 
-    // archSVG's boxes navigate by hash (location.hash='memory/overview'). In a
-    // dialog that would move the page BEHIND it, so the dialog steps aside.
+    // A box in the chart is a link — archSVG gives each one an inline onclick —
+    // and following it moves the page BEHIND the dialog, so the dialog steps
+    // aside when one is clicked.
+    //
+    // Only a box, though. This used to close on any click that landed inside the
+    // <svg>, and since the chart fills most of the dialog, the dialog could not
+    // be kept open: the first click on the diagram dismissed it. The selector is
+    // [onclick] rather than "svg" for that reason.
     dlg.addEventListener("click", (e) => {
-      if (e.target && e.target.closest && e.target.closest("svg")) dlg.close();
+      const el = e.target;
+      if (el && el.closest && el.closest("[onclick]")) dlg.close();
     });
 
     // openDialog closes on a backdrop click, and a double-click on a seat is two
