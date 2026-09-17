@@ -396,6 +396,22 @@
       if (e.target && e.target.closest && e.target.closest("svg")) dlg.close();
     });
 
+    // openDialog closes on a backdrop click, and a double-click on a seat is two
+    // clicks: the first opens this dialog, the second lands on the backdrop and
+    // would close it again — so a double-click would look like nothing happened.
+    // Backdrop clicks are ignored for a moment after opening: long enough for the
+    // second click of a double-click, short enough that click-outside-to-close
+    // still feels immediate. The listener sits on the document in the CAPTURE
+    // phase, because that runs before the dialog's own.
+    const settle = Date.now() + 400;
+    const guard = (e) => {
+      if (Date.now() < settle && e.target === dlg) e.stopPropagation();
+    };
+    document.addEventListener("click", guard, true);
+    dlg.addEventListener("close", () => {
+      document.removeEventListener("click", guard, true);
+    });
+
     // The chart's animation selects its boxes globally, so it would light for
     // any seat's events. While this dialog is open, only this seat's get through.
     if (stageBase) {
@@ -457,6 +473,16 @@
     };
     svg.addEventListener("pointerup", stop);
     svg.addEventListener("pointercancel", stop);
+
+    // Right-click opens the same dialog. A context menu has no pointer capture
+    // in front of it, so e.target is the card here — but the guard keeps the
+    // two paths behaving alike.
+    svg.addEventListener("contextmenu", (e) => {
+      const under = e.target && e.target.closest ? e.target.closest(".dep-node") : null;
+      if (!under) return;                 // elsewhere on the graph: leave the menu alone
+      e.preventDefault();
+      openSeat(under.getAttribute("data-seat"));
+    });
   }
 
   function zoomBar() {
