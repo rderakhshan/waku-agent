@@ -65,36 +65,48 @@ CFOs turn solid when they compare notes.
 
 ## Quickstart
 
-Just want to run it:
+Irina lives in this repository, not on PyPI. `pip install waku-agent` gives you **Waku** — the
+agent runtime underneath — without the department, because the wheel ships only `waku/`. So
+clone it:
 
 ```bash
-pip install waku-agent
-waku                                    # talk to your Waku in the terminal
-waku dashboard                          # …or the browser cockpit → localhost:7777
+git clone https://github.com/rderakhshan/Irina-Graph && cd Irina-Graph
+uv venv && uv pip install -e .          # create the env; installs waku and the department
+cp .env.example .env                    # add DEEPSEEK_API_KEY
+uv run python -m concentric             # talk to Irina in the terminal
+uv run python -m concentric.dashboard   # the department in the browser → localhost:7778
+uv run python -m concentric.demo        # offline proof, no key, no spend
 ```
 
-It will tell you which key to set the first time. Want to **read the code** (the
-point of this repo) or contribute — clone it instead:
+Every seat runs on **DeepSeek** by default. That default is one line in
+`concentric/__init__.py`, and changing it there changes the whole department.
+
+### Waku is still here, and still works
+
+Irina is twenty-four Waku agents, so the runtime underneath is yours to drive directly, exactly
+as Waku documents it:
 
 ```bash
-git clone https://github.com/ShenSeanChen/waku-agent && cd waku-agent
-uv venv && uv pip install -e .          # create the env + install the `waku` command
-cp .env.example .env                    # pick a provider, paste ONE key
-uv run waku                             # talk to your Waku in the terminal
-uv run waku dashboard                   # …or the browser cockpit → localhost:7777
+uv run waku                             # the single Waku agent, in the terminal
+uv run waku dashboard                   # Waku's own cockpit → localhost:7777
 ```
 
-**Now try it.** *"Remember that Alex prefers morning meetings."* Quit. Restart.
-*"Book a catch-up with Alex on Friday."* → it remembers, and books 9am. Your memory is one
-file: `.waku/state.db`.
+Irina's dashboard **is** that cockpit — the same panels, the same `state.db` shape — pointed at
+her and extended with a Department view. `localhost:7777` is Waku; `localhost:7778` is Irina.
+Comparing the two is the quickest way to see what this repository adds.
 
-**Use the model you already pay for.** Anthropic (default), OpenAI, Gemini, DeepSeek, MiniMax,
-Kimi, GLM, OpenRouter (one key, hundreds of hosted models), OpenCode Zen, or OpenCode Go —
-set `WAKU_PROVIDER=`, paste the key, done. One dialect in the loop;
+**Waku's own walkthrough.** *"Remember that Alex prefers morning meetings."* Quit. Restart.
+*"Book a catch-up with Alex on Friday."* → it remembers, and books 9am. Waku's memory is one
+file, `.waku/state.db`. Irina's is one file per seat, under `.waku-concentric/agents/`.
+
+**Use the model you already pay for.** Anthropic (Waku's default), OpenAI, Gemini, DeepSeek,
+MiniMax, Kimi, GLM, OpenRouter (one key, hundreds of hosted models), OpenCode Zen, or OpenCode
+Go — set `WAKU_PROVIDER=`, paste the key, done. One dialect in the loop;
 a [~60-line adapter](waku/loop/models.py) handles the rest.
 
-New to it? **[Getting started](docs/getting-started.md)** walks the whole setup, with a check
-at the end of every step.
+New to it? **[Getting started](docs/getting-started.md)** walks Waku's whole setup, with a
+check at the end of every step — and everything in it applies here, because the runtime is the
+same one.
 
 ## Connect Waku Memory
 
