@@ -758,7 +758,14 @@
 
   let cursor = null;
   async function poll() {
-    if ((location.hash || "").slice(1).split("/")[0] !== "department") return;
+    // Only while the graph is actually on screen. There is nothing to beat
+    // otherwise, and the cursor would drift past events nobody saw.
+    //
+    // This used to test the hash for "department". The view then became a tab of
+    // #overview, the hash stopped ever being #department, and the poll returned
+    // early from then on — no beats, no lit edges, nothing failing loudly. Asking
+    // the DOM what is on screen cannot rot that way.
+    if (!document.querySelector("svg.dep")) return;
     try {
       const r = await (await fetch("/api/events" + (cursor == null ? "" : "?cursor=" + cursor))).json();
       if (cursor != null) r.events.forEach(beat);
