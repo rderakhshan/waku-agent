@@ -1,30 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Irina's mark: a hub with four satellites — Irina and her four CFOs, which
-       is the shape the Department view draws.
+<!-- The Irina mark, as the browser tab draws it.
 
-       Same two jobs as waku's mark, so it follows the same conventions:
+     A hub with four satellites: Irina and her four CFOs. The spokes are the
+     delegation edges, and the thin ring through the satellites is the round
+     table they consult each other on — the same shape the Department view and
+     the README poster draw.
 
-       1. It is used as a CSS mask (the sidebar) AND as a favicon. A mask reads
-          the alpha channel only, so solid shapes on a transparent field are all
-          it needs; the favicon has no page to inherit from, so the two ink
-          values are written here and switched by the tab's colour scheme.
-       2. No <img>: an <img> would follow the browser's scheme, not the page's.
-  -->
+     A favicon cannot read the page's tokens, so the two ink values are written
+     out here and switched by the tab's own colour scheme. The README cannot do
+     that either (GitHub strips styling from a README's SVG), so the two inks
+     ship there as two more files under docs/brand/, picked by <picture>.
+     test_brand_mark.py fails if the three copies ever drift. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <style>
     .ink { fill: #161614; stroke: #161614 }
     @media (prefers-color-scheme: dark) { .ink { fill: #C9CDD1; stroke: #C9CDD1 } }
   </style>
   <g class="ink">
-    <g fill="none" stroke-width="2.4" stroke-linecap="round">
-      <line x1="16" y1="16" x2="16" y2="4.5"/>
-      <line x1="16" y1="16" x2="27.5" y2="16"/>
-      <line x1="16" y1="16" x2="16" y2="27.5"/>
-      <line x1="16" y1="16" x2="4.5" y2="16"/>
-    </g>
-    <circle cx="16" cy="16" r="4.6"/>
-    <circle cx="16" cy="4.5" r="2.9"/>
-    <circle cx="27.5" cy="16" r="2.9"/>
-    <circle cx="16" cy="27.5" r="2.9"/>
-    <circle cx="4.5" cy="16" r="2.9"/>
+    <path d="M32 32 L32 11 M32 32 L53 32 M32 32 L32 53 M32 32 L11 32"
+          fill="none" stroke-width="3.2" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="21" fill="none" stroke-width="1.7"/>
+    <circle cx="32" cy="32" r="8"/>
+    <circle cx="32" cy="11" r="5.4"/>
+    <circle cx="53" cy="32" r="5.4"/>
+    <circle cx="32" cy="53" r="5.4"/>
+    <circle cx="11" cy="32" r="5.4"/>
   </g>
 </svg>

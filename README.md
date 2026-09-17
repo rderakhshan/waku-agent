@@ -1,9 +1,9 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/waku-mark-on-dark.svg">
-  <img src="docs/brand/waku-mark-on-light.svg" alt="Waku" width="76" align="right">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/irina-mark-on-dark.svg">
+  <img src="docs/brand/irina-mark-on-light.svg" alt="Irina Graph" width="76" align="right">
 </picture>
 
-# Irina-AI Powered Model Risk Management Assistant
+# Irina Graph
 
 > **Irina is under constant development.** The department runs end to end — delegation, scope and
 > depth are enforced in code — but the prompts in this README are tuned for demonstration. For
