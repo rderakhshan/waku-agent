@@ -69,3 +69,58 @@
     window.scrollTo(0, winY);
   };
 })();
+
+// The LLMOps fold: the cockpit pages fold away behind one row.
+//
+// waku's rail has no nesting beyond its section headings, so the fold IS the
+// heading — same type, same rule — plus a caret and a click. aria-expanded on
+// the row is the single source of state: the stylesheet keys off it and so does
+// this file, so there is no second copy to drift.
+//
+// It runs after main.js, so the rail is parsed and main.js has already bound its
+// own handlers. The fold does not touch them: main.js lights the current page by
+// class on the anchors, and hiding an anchor does not stop that.
+(function () {
+  const fold = document.getElementById("llmops");
+  const nav = document.getElementById("nav");
+  if (!fold || !nav) return;
+
+  // The pages the fold holds. Arriving at one must never leave it hidden behind
+  // a closed fold, so these open it.
+  const INSIDE = new Set(["gateway", "loop", "graph", "memory", "tools",
+                          "database", "ops", "compare"]);
+  const KEY = "llmopsOpen";
+
+  function store(open) {
+    try { localStorage.setItem(KEY, open ? "1" : "0"); }
+    catch (e) { /* private mode: the fold simply will not remember */ }
+  }
+
+  // Setting the attribute IS the change — the stylesheet does the hiding.
+  function set(open) {
+    fold.setAttribute("aria-expanded", open ? "true" : "false");
+    nav.dataset.llmops = open ? "open" : "closed";
+  }
+
+  let saved = null;
+  try { saved = localStorage.getItem(KEY); } catch (e) { /* private mode */ }
+  set(saved !== "0");   // open unless the reader closed it
+
+  function toggle() {
+    const open = fold.getAttribute("aria-expanded") !== "true";
+    set(open);
+    store(open);
+  }
+
+  fold.addEventListener("click", toggle);
+  fold.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+  });
+
+  const reveal = () => {
+    const view = (location.hash || "").slice(1).split("/")[0];
+    if (INSIDE.has(view)) { set(true); store(true); }
+  };
+  reveal();
+  window.addEventListener("hashchange", reveal);
+})();

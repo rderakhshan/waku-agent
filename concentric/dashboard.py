@@ -164,17 +164,25 @@ def _picker() -> str:
             '</label>\n')
 
 
-def _rail(html: str) -> str:
-    """Home above the Work Desk, and the cockpit pages under one LLMOps heading.
+# The cockpit pages, in the order the rail lists them: everything the fold
+# heading sits above, and everything the fold hides when it is closed.
+_LLMOPS_PAGES = ("gateway", "loop", "graph", "memory", "tools", "database", "ops",
+                 "compare/models", "compare/memory")
 
-    waku's rail has no nesting beyond its section headings, so this reuses the
-    heading it already draws rather than inventing a control. Nothing about the
-    pages themselves changes — only where the rail puts them, which is why this
-    is string surgery on the shell and not a single edit to a view.
+
+def _rail(html: str) -> str:
+    """Home above the Work Desk, and the cockpit pages behind one LLMOps tab.
+
+    waku's rail has no nesting beyond its section headings, so the fold reuses
+    the heading it already draws — same type, same rule — and adds a caret and a
+    click. Nothing about the pages themselves changes: only whether the rail is
+    showing them, which is why this is string surgery on the shell and not a
+    single edit to a view.
 
     The anchors stay DIRECT children of <nav>: `.rail > a` is what styles them, so
-    wrapping them in a container would take their look away. A heading and its
-    rows is the two-level menu the rail already speaks."""
+    wrapping them in a container would take their look away. Hiding them is a
+    rule keyed off the <nav> element instead, and layout.js only ever sets one
+    attribute on it."""
     # "System" held Overview and the cockpit pages; "Arena" held the two races.
     # LLMOps replaces the first, and the races move under it.
     html = html.replace('<div class="r-grp">System</div>', "", 1)
@@ -188,11 +196,19 @@ def _rail(html: str) -> str:
         '<span class="lbl">Home</span></a>\n  '
         '<a href="#overview" data-v="overview" data-short="W" aria-label="Work Desk">'
         '<span class="lbl">Work Desk</span></a>', 1)
-    # The heading takes the place of the first of its pages, so the pages keep the
-    # order they already had.
+    # The fold takes the place of the first of its pages, so the pages keep the
+    # order they already had. aria-expanded is the single source of state — the
+    # stylesheet and layout.js read it rather than keeping a second copy.
     html = html.replace(
         '<a href="#gateway"',
-        '<div class="r-grp">LLMOps</div>\n  <a href="#gateway"', 1)
+        '<div class="r-grp r-fold" id="llmops" role="button" tabindex="0" '
+        'aria-expanded="true" aria-controls="nav">LLMOps'
+        '<i class="r-fold-rule" aria-hidden="true"></i>'
+        '<i class="r-caret" aria-hidden="true"></i></div>\n  '
+        '<a data-grp="llmops" href="#gateway"', 1)
+    for page in _LLMOPS_PAGES[1:]:
+        html = html.replace(f'<a href="#{page}"',
+                            f'<a data-grp="llmops" href="#{page}"', 1)
     return html
 
 

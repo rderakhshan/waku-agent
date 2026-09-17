@@ -676,3 +676,25 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
    space; the grid stretches by default. */
 .home-grid-2{align-items:start}
 .home-grid-2 .home-stage{min-width:64px;padding:var(--space-2) var(--space-3)}
+
+/* ---- the LLMOps fold.
+   The heading the rail already draws, plus a caret and a click. The children
+   stay direct children of <nav>, because .rail > a is what styles them, so
+   hiding them is a rule keyed off <nav> rather than a wrapper around them. */
+.r-fold{cursor:pointer;user-select:none}
+.r-fold:hover{color:var(--text-ink)}
+.r-fold:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* this row draws its own rule, so the caret can sit after it */
+.r-fold::after{display:none}
+.r-fold-rule{flex:1;height:1px;background:var(--rule)}
+.r-caret{flex-shrink:0;width:0;height:0;
+  border-left:4px solid currentColor;border-top:3.5px solid transparent;
+  border-bottom:3.5px solid transparent;
+  transform:rotate(90deg);transition:transform 140ms ease}
+.r-fold[aria-expanded="false"] .r-caret{transform:rotate(0)}
+/* Closed: the pages it holds are gone. A page you are ON is never left hidden;
+   layout.js opens the fold when you arrive at one. */
+#nav[data-llmops="closed"] a[data-grp="llmops"]{display:none}
+/* Icon-only rail: no room for a fold control, so show them as monograms, which
+   is all a collapsed rail shows anyway. */
+.rail.collapsed a[data-grp="llmops"]{display:flex}
