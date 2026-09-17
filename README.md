@@ -34,7 +34,7 @@ rather than in prompts.
 
 [![Irina's department — click to watch the demo](docs/department-demo.gif)](docs/department-demo.mp4)
 
-*The GIF is a 20-second preview; click it for the full demo (5 min).*
+*The GIF is a 20-second preview; click it for the full demo (7 min).*
 
 ```bash
 uv run python -m concentric                  # talk to Irina in the terminal
