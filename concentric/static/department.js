@@ -426,7 +426,7 @@
       drag = { x: e.clientX, y: e.clientY };
       downAt = { x: e.clientX, y: e.clientY };
       svg.classList.add("panning");
-      svg.setPointerCapture(e.pointerId);
+      try { svg.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
     });
     svg.addEventListener("pointermove", (e) => {
       if (!drag) return;
@@ -438,14 +438,22 @@
     });
     // A pointerup is a click only if the pointer barely moved — otherwise every
     // pan would open whatever seat the drag happened to end on.
+    //
+    // The target is asked of the DOCUMENT, not taken from the event. While a
+    // pointer is captured the pointerup is dispatched to the capturing element —
+    // the <svg> — so e.target.closest(".dep-node") is always null and no seat
+    // would ever open.
     const stop = (e) => {
       const moved = downAt ? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) : 999;
-      const node = e.target && e.target.closest ? e.target.closest(".dep-node") : null;
       drag = null;
       downAt = null;
       svg.classList.remove("panning");
       try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
-      if (moved < 5 && node) openSeat(node.getAttribute("data-seat"));
+      if (moved >= 5) return;
+      const under = typeof document.elementFromPoint === "function"
+        ? document.elementFromPoint(e.clientX, e.clientY) : e.target;
+      const node = under && under.closest ? under.closest(".dep-node") : null;
+      if (node) openSeat(node.getAttribute("data-seat"));
     };
     svg.addEventListener("pointerup", stop);
     svg.addEventListener("pointercancel", stop);
