@@ -43,12 +43,14 @@
   const OPEN_W = 700, OPEN_H = 600;
   const CHART_W = 640, CHART_H = 427;
 
-  // Which seat is open, if any. Module state, because the view is rebuilt from
-  // scratch every few seconds and the expansion has to survive that.
-  let expanded = null;
+  // Which seats are open. A set, not a single role: any number of seats may be
+  // open at once, and opening one never closes another. Module state, because
+  // the view is rebuilt from scratch every few seconds and the expansions have
+  // to survive that.
+  const expanded = new Set();
 
   function sizeOf(seat) {
-    return seat.role === expanded ? [OPEN_W, OPEN_H] : NODE[seat.ring];
+    return expanded.has(seat.role) ? [OPEN_W, OPEN_H] : NODE[seat.ring];
   }
 
   // The four stages drawn inside every seat, left to right, each mapped to the
@@ -276,7 +278,7 @@
     // The open seat changes the sizes, so it is part of the key: expanding one
     // re-runs the settle and the neighbours move aside for it.
     const key = dep.seats.map((s) => `${s.role}:${s.built ? 1 : 0}`).join("|")
-      + "|" + (expanded || "");
+      + "|" + [...expanded].sort().join(",");
     if (cache.key !== key) cache = { key, result: simulate(dep) };
     return cache.result;
   }
@@ -342,13 +344,17 @@
       + `ring ${s.ring} &middot; ${s.built ? "has run" : "never used"}</text>`
       + `<text class="dep-close" x="${OPEN_W - 30}" y="42" text-anchor="end" `
       + `font-size="14">click to close</text>`
+      // data-card marks this chart as this seat's, so the shared hot() lights it
+      // for this seat's events and no one else's.
+      + `<g class="dep-chart" data-card="${esc(s.role)}">`
       + innerChart(d, (OPEN_W - CHART_W) / 2, 88, CHART_W, CHART_H)
+      + `</g>`
       + facts
       + `</g>`;
   }
 
   function card(s, x, y) {
-    if (s.role === expanded) return openCard(s, x, y);
+    if (expanded.has(s.role)) return openCard(s, x, y);
     const [w, h] = NODE[s.ring];
     const cls = `dep-node dep-r${s.ring} ${s.built ? "built" : "cold"}`;
     const max = s.ring === 0 ? 26 : s.ring === 1 ? 22 : 19;
@@ -437,22 +443,59 @@
   // ---- clicking a seat opens its architecture.
   //
   // The chart is waku's own archSVG — the same function the Single Agent tab
-  // draws — so this is that chart, not a copy of it. Only one is ever in the
-  // DOM, and that is what makes it work: archSVG's boxes share data-node names
-  // and its animation selects them globally, so two copies would light each
-  // other. One at a time, and the ids are unique again.
+  // draws — so this is that chart, not a copy of it.
   //
   // The picture is identical for every seat, because every seat is a Waku. What
   // is NOT identical is the header above it — this seat's own tools, memory and
   // spend — which is what makes the dialog about this seat rather than about the
   // architecture in general.
   let latest = null;
-  // Captured ONCE, at load. Taking the base at open time instead means a second
-  // dialog captures the first dialog's patch, and the two never fully unwind.
-  // diagram.js loads before this file and owns animateStage; the guard is for a
-  // page where it did not, so the dialog simply does not animate rather than
-  // failing to open.
+
+  // ---- one chart, many copies.
+  //
+  // archSVG gives its boxes shared data-node names, and diagram.js animates them
+  // through hot(), which selects EVERY copy in the document — its own comment
+  // says as much: "every diagram copy lights up". graph.js hit the same thing and
+  // notes that "hot() deliberately hits every match, so the bug looked like a
+  // feature". With one diagram on the page that is exactly right.
+  //
+  // With a card open per seat it is not: seat A working would set every open card
+  // beating at once, and each would claim the work was its own.
+  //
+  // So hot() is wrapped once, here, at load. Anything inside a [data-card] lights
+  // only for that card's seat; anything outside one — the Single Agent chart, the
+  // graph's own nodes, the Overview page — lights for everything, exactly as
+  // before. hotSeat carries the seat from animateStage down to the wrapper.
+  //
+  // Wrapping hot() rather than filtering events is what lets the number of open
+  // cards be unlimited: each copy answers for itself, so no one has to know how
+  // many there are.
+  //
+  // Both are captured at load and never re-captured. diagram.js loads first and
+  // owns them; the guards are for a page where it did not, so the charts simply
+  // do not animate rather than the view failing to render.
+  const hotBase = typeof hot === "function" ? hot : null;
   const stageBase = typeof animateStage === "function" ? animateStage : null;
+  let hotSeat = null;
+
+  if (hotBase) {
+    hot = (sel, cls, ms) => {
+      if (hotSeat === null) return hotBase(sel, cls, ms);
+      document.querySelectorAll(sel).forEach((el) => {
+        const card = el.closest && el.closest("[data-card]");
+        if (card && card.getAttribute("data-card") !== hotSeat) return;
+        el.classList.add(cls);
+        setTimeout(() => el.classList.remove(cls), ms);
+      });
+    };
+  }
+  if (stageBase) {
+    animateStage = (ev) => {
+      if (!ev) return stageBase(ev);
+      hotSeat = ev.role || "";
+      try { stageBase(ev); } finally { hotSeat = null; }
+    };
+  }
 
   function seatFacts(seat, d) {
     const db = ((d.db && d.db.seats) || []).find((r) => r.seat === seat.role) || {};
@@ -483,15 +526,12 @@
     if (!d || !d.department || typeof openDialog !== "function") return;
     const seat = d.department.seats.find((s) => s.role === role);
     if (!seat) return;
-    // Two archSVG copies in one document would share their data-node names and
-    // light each other, so the dialog and an open card are never both up.
-    if (expanded) {
-      expanded = null;
-      scopeStage();
-      if (typeof render === "function") render();
-    }
-    const dlg = openDialog(seatHead(seat, d) + archSVG(d),
-                           { wide: true, label: seat.title });
+    // data-card marks this chart as this seat's, by the same rule the cards in
+    // the graph follow, so the shared hot() lights it for this seat's events and
+    // no one else's.
+    const dlg = openDialog(
+      `<div data-card="${esc(role)}">${seatHead(seat, d)}${archSVG(d)}</div>`,
+      { wide: true, label: seat.title });
 
     // A box in the chart is a link — archSVG gives each one an inline onclick —
     // and following it moves the page BEHIND the dialog, so the dialog steps
@@ -521,39 +561,18 @@
     dlg.addEventListener("close", () => {
       document.removeEventListener("click", guard, true);
     });
-
-    // The chart's animation selects its boxes globally, so it would light for
-    // any seat's events. While this dialog is open, only this seat's get through.
-    if (stageBase) {
-      const mine = (ev) => { if (ev && ev.role === role) stageBase(ev); };
-      animateStage = mine;
-      dlg.addEventListener("close", () => {
-        if (animateStage === mine) animateStage = stageBase;
-      });
-    }
-  }
-
-  // The chart's animation selects its boxes globally, so while a seat is open
-  // only that seat's events may light it — a neighbour working must not appear to
-  // be happening inside the seat you opened. With nothing open, everything
-  // passes as before.
-  function scopeStage() {
-    if (!stageBase) return;
-    if (!expanded) {
-      animateStage = stageBase;
-      return;
-    }
-    const role = expanded;
-    animateStage = (ev) => { if (ev && ev.role === role) stageBase(ev); };
   }
 
   // Expanding happens in the graph, not in a dialog: the card grows where it
   // sits, the neighbours move aside for it, and the chart inside it keeps
   // lighting while you watch. render() is the router's own function, so the
   // rebuilt view is the same one every other change goes through.
+  //
+  // Opening one seat leaves the others alone — the set grows and shrinks one
+  // role at a time.
   function toggleSeat(role) {
-    expanded = expanded === role ? null : role;
-    scopeStage();
+    if (expanded.has(role)) expanded.delete(role);
+    else expanded.add(role);
     if (typeof render === "function") render();
   }
 
