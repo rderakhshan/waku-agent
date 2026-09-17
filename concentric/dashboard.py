@@ -129,9 +129,9 @@ def department_payload() -> dict:
 
 # Injected into waku's shell in memory. The files on disk are never touched, so
 # the stock dashboard (7777) and the tests that guard it are unaffected.
-_RAIL = ('<div class="r-grp">Department</div>\n'
-         '<a href="#department" data-v="department" data-short="D" '
-         'aria-label="Department"><span class="lbl">Department</span></a>\n')
+#
+# There is no Department rail item: the department is the second tab of the
+# Overview page (see department.js), so the rail keeps one entry for both.
 _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
@@ -170,8 +170,6 @@ def _inject(html: str) -> str:
     html = html.replace('href="/static/waku-mark.svg"', 'href="/irina-mark.svg"', 1)
     html = html.replace('<span class="r-name">WAKU</span>',
                         '<span class="r-name">IRINA</span>', 1)
-    html = html.replace('<div class="r-grp">System</div>',
-                        _RAIL + '<div class="r-grp">System</div>', 1)
     html = html.replace('<div class="r-bottom">', _picker(), 1)
     html = html.replace("</head>", _BRAND + "</head>", 1)
     html = html.replace('<script src="/static/js/main.js"></script>',

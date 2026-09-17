@@ -586,4 +586,34 @@
         ${dep.edges.length} delegation edges. Grey = never used.</div>`)
       + seatsTable(dep);
   };
+  // ---- Overview and Department are one page with two tabs.
+  //
+  // The nav keeps a single entry, and these live inside it. main.js calls
+  // VIEWS.overview(D) without the sub-path — the overview branch of its router
+  // predates sub-tabs — so the active tab is read from location.hash, which is
+  // where the router keeps it anyway, and hashchange is already wired to render.
+  //
+  // Nothing below reimplements either view: Single Agent is waku's own overview
+  // function and Multi Agentic is the department function above, called as they
+  // always were.
+  const overviewBase = VIEWS.overview;
+  const departmentBase = VIEWS.department;
+
+  function viewTabs(multi) {
+    return uiTabs([
+      { label: "Single Agent", href: "#overview", on: !multi },
+      { label: "Multi Agentic", href: "#overview/multi", on: multi },
+    ]);
+  }
+
+  VIEWS.overview = (d, sub) => {
+    const multi = (location.hash || "").slice(1).split("/")[1] === "multi";
+    // The head is written by the router before the view runs, so the tab's name
+    // is put back after it.
+    setTimeout(() => {
+      const title = document.getElementById("title");
+      if (title) title.textContent = multi ? "Multi Agentic" : "Single Agent";
+    }, 0);
+    return viewTabs(multi) + (multi ? departmentBase(d, sub) : overviewBase(d, sub));
+  };
 })();
