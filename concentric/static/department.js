@@ -701,9 +701,23 @@
       if (n) p.push(card(s, n.x, n.y));
     });
 
-    // The viewBox is set by attachZoom after this markup lands, so the graph is
-    // fitted to its own bounds rather than to a fixed canvas.
+    // The viewBox goes INTO the markup, not into a deferred attachZoom.
+    //
+    // An SVG with no viewBox draws its content at 1:1, anchored at the origin.
+    // This graph spans a few thousand units, so the frame between the markup
+    // landing and attachZoom's setTimeout(0) showed a hugely magnified corner of
+    // the graph, then snapped to the fitted view. A visible jump on every 5s
+    // refresh. Carrying the current view in here means the new SVG starts exactly
+    // where the old one was, so there is no frame in between to see.
+    //
+    // Before the first fit there is no view to carry, and the layout's own bounds
+    // stand in: the whole graph rather than its corner.
+    const b = bounds(L.nodes);
+    const vb = view
+      ? `${view.x} ${view.y} ${view.w} ${view.h}`
+      : `${b.x0 - PAD} ${b.y0 - PAD} ${b.x1 - b.x0 + PAD * 2} ${b.y1 - b.y0 + PAD * 2}`;
     return `<div class="dep-wrap"><svg class="dep" preserveAspectRatio="xMidYMid meet"`
+      + ` viewBox="${vb}"`
       + ` role="img" aria-label="The department: ${dep.seats.length} seats and their edges"`
       + `>${p.join("")}</svg></div>` + zoomBar();
   }
