@@ -1,14 +1,23 @@
-// The department — four wheels around Irina, live.
+// The department — a force-directed graph, live.
 //
 // Served by `python -m concentric.dashboard` at /department.js and injected into
 // waku's shell by the launcher. One rail item, one view; waku's files are never
-// touched. This file is the whole of the change: layout is the view's business,
-// and the roster carries only `ring` and `parent`.
+// touched.
 //
-// Each CFO is the HUB of its own wheel - the centre of the circle its workers
-// sit on - and one spoke runs from the hub out to each worker. Irina sits
-// between the four wheels and reaches each hub. So the spoke that lights names
-// the exact seat that is working.
+// The layout is the one an Obsidian graph uses: nodes push each other apart,
+// edges pull their ends together, and the picture settles into whatever shape
+// that produces. Nothing is placed on a ring or a grid, so the department does
+// not come out symmetric — teams cluster because their edges are denser, which
+// is a fact about the graph rather than a decision about the drawing.
+//
+// Two things it must keep:
+//   1. DETERMINISM. main.js re-renders #view every 5s. A layout seeded from
+//      Math.random would reshuffle the graph under the reader's eyes, so every
+//      position comes from a hash of the seat's own role, and the result is
+//      cached until the set of seats changes.
+//   2. THE VIEW. Same reason: the zoom and pan live in module state and are
+//      re-applied to each new SVG, so a refresh does not throw the reader back
+//      to the whole graph.
 //
 // Every seat IS a Waku, so every seat runs the same inner flow. Each block holds
 // a compact version of it - gate, llm, tool, out - and the part that is working
@@ -16,14 +25,14 @@
 // them globally, so 24 copies would light all 24 at once. These parts are scoped
 // by data-seat, so only the working seat beats.
 (function () {
-  // node sizes by ring: Irina, CFO (hub), worker
-  const NODE = { 0: [230, 88], 1: [206, 74], 2: [168, 66] };
+  // node sizes by ring: Irina, CFO (hub), worker. Sized for the names they
+  // carry rather than to fit a grid.
+  const NODE = { 0: [345, 138], 1: [309, 116], 2: [252, 104] };
+  const PART_W = 51, PART_H = 30, PART_GAP = 8;
+  const TITLE = { 0: 22.5, 1: 18, 2: 16.5 };
 
-  const W = 1240, H = 1240;
-  const RING_R = 160;                        // the worker circle around each hub
-  const IRINA = [W / 2, H / 2];
-  const HUBS = [[340, 340], [900, 340], [900, 900], [340, 900]];  // clockwise
   const BEAT_MS = 1400;
+  const PAD = 60;                 // breathing room around the fitted graph
 
   // The four stages drawn inside every seat, left to right, each mapped to the
   // trace event that lights it — the same idea as diagram.js's STAGE map.
@@ -36,38 +45,46 @@
   const EVENT_PART = { gate: "gate", llm: "llm", tool: "tool", turn_end: "out" };
 
   const CSS = `
-  .dep-wrap{display:flex;justify-content:center;overflow:auto}
-  /* ING Me is ING's proprietary corporate typeface and is not redistributed
-     here. It is simply named first: a machine that has it installed renders
-     with it, everyone else falls through to the bundled Instrument Sans (OFL)
-     and then the system stack. Nothing proprietary enters the repo. */
-  .dep{width:100%;min-width:900px;max-width:1240px;height:auto;
-    font-family:"ING Me","Instrument Sans","Segoe UI",Helvetica,Arial,sans-serif}
-  .dep-wheel{fill:none;stroke:var(--border,#dce6f2);stroke-width:1.4;stroke-dasharray:6 6;
-    opacity:.7}
-  .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:1.3;fill:none}
+  .dep-wrap{position:relative}
+  .dep{display:block;width:100%;height:74vh;min-height:460px;
+    font-family:"ING Me","Instrument Sans","Segoe UI",Helvetica,Arial,sans-serif;
+    cursor:grab;touch-action:none}
+  .dep.panning{cursor:grabbing}
+  .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:1.4;fill:none}
   .dep-edge.live{stroke:var(--warn,#b36b00);stroke-width:3}
-  .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:1;stroke-dasharray:4 4;opacity:.28}
+  .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:1;stroke-dasharray:4 4;opacity:.3}
   .dep-peer.live{stroke:var(--warn,#b36b00);stroke-width:2.6;stroke-dasharray:none;opacity:1}
-  .dep-card{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.4}
+  .dep-card{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.6}
   .dep-r0 .dep-card{fill:var(--accent,#1e4e8c);stroke:#0a1b3a}
   .dep-r1 .dep-card{fill:var(--accent-soft,#eaf2fb);stroke:var(--accent,#1e4e8c)}
-  .dep-title{font-size:11px;fill:var(--text,#0a1b3a);font-family:inherit;pointer-events:none}
-  .dep-r0 .dep-title{font-size:15px;fill:#fff;font-weight:700}
-  .dep-r1 .dep-title{font-size:12px;font-weight:700;fill:var(--accent,#1e4e8c)}
+  .dep-title{fill:var(--text,#0a1b3a);font-family:inherit;pointer-events:none}
+  .dep-r0 .dep-title{fill:#fff;font-weight:700}
+  .dep-r1 .dep-title{font-weight:700;fill:var(--accent,#1e4e8c)}
   .dep-node.cold .dep-card{opacity:.42}
   .dep-node.cold .dep-title{opacity:.55}
-  .dep-part rect{fill:var(--surface,#fff);stroke:var(--border,#9dc2e8);stroke-width:1;
+  .dep-part rect{fill:var(--surface,#fff);stroke:var(--border,#9dc2e8);stroke-width:1.2;
     transform-box:fill-box;transform-origin:center}
-  .dep-part text{font-size:10px;fill:var(--muted,#5a6b80);font-family:inherit;pointer-events:none}
+  .dep-part text{fill:var(--muted,#5a6b80);font-family:inherit;pointer-events:none}
   .dep-r0 .dep-part rect{fill:#2a63a8;stroke:#7fa8d6}
   .dep-r0 .dep-part text{fill:#dbe8f7}
   .dep-part.hot rect{fill:var(--warn,#b36b00);stroke:var(--warn,#b36b00);
     animation:dep-beat .55s ease-in-out 3}
   .dep-part.hot text{fill:#fff;font-weight:700}
-  .dep-node.beat .dep-card{stroke-width:3.4}
+  .dep-node.beat .dep-card{stroke-width:4}
+  .dep-node{cursor:pointer}
+  .dep-bar{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-2)}
+  .dep-hint{font-size:var(--text-xs);color:var(--text-faint)}
+  .dep-zoom{margin-left:auto;display:flex;gap:2px;
+    border:var(--rule-width) solid var(--rule);border-radius:10px;overflow:hidden;
+    background:var(--surface-paper);box-shadow:var(--shadow-sm)}
+  .dep-zoom button{border:0;background:transparent;color:var(--text-muted);cursor:pointer;
+    font-family:var(--face-mono);font-size:var(--text-xs);font-weight:600;
+    padding:6px 12px;line-height:1;transition:background var(--motion-fast) var(--motion-ease),
+    color var(--motion-fast) var(--motion-ease)}
+  .dep-zoom button:hover{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--text-ink)}
+  .dep-zoom button + button{border-left:var(--rule-width) solid var(--rule)}
   .dep-legend{display:flex;gap:var(--space-4);flex-wrap:wrap;margin-top:var(--space-3)}
-  .dep-key{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted,#5a6b80)}
+  .dep-key{display:flex;align-items:center;gap:6px;font-size:var(--text-xs);color:var(--muted,#5a6b80)}
   .dep-swatch{width:14px;height:10px;border-radius:3px;border:1.3px solid var(--border,#2e6db4)}
   @keyframes dep-beat{0%,100%{transform:scale(1)}50%{transform:scale(1.18)}}
   `;
@@ -80,8 +97,6 @@
     document.head.appendChild(el);
   }
 
-  // Long role names overflowed their card before. Wrap to at most two lines so
-  // the title stays inside the box instead of bleeding across its neighbours.
   function wrap(text, max) {
     const words = String(text).split(" ");
     const lines = [];
@@ -96,7 +111,7 @@
   }
 
   // The point where the line centre -> target crosses the node's rectangle, so
-  // a spoke starts and ends on the card edge instead of under it.
+  // an edge starts and ends on the card edge instead of under it.
   function edgePoint(cx, cy, hw, hh, tx, ty) {
     const dx = tx - cx, dy = ty - cy;
     if (!dx && !dy) return [cx, cy];
@@ -106,48 +121,109 @@
     return [cx + dx * s, cy + dy * s];
   }
 
-  // ---- layout. CFOs take the four hubs in roster order; each team's workers
-  // sit on that hub's circle, rotated so the gap faces Irina.
-  function layout(dep) {
-    const cfos = dep.seats.filter((s) => s.ring === 1);
-    const pos = {};
-    const hubOf = {};
-
-    pos[dep.entry] = IRINA;
-    cfos.forEach((c, i) => {
-      const [hx, hy] = HUBS[i % HUBS.length];
-      hubOf[c.role] = [hx, hy];
-      pos[c.role] = [hx, hy];
-    });
-
-    cfos.forEach((c) => {
-      const [hx, hy] = hubOf[c.role];
-      const team = dep.seats.filter((s) => s.parent === c.role);
-      const n = team.length || 1;
-      const step = 360 / n;
-      // Aim the gap at Irina: start half a step past the direction to her, so no
-      // worker sits on the hub-to-Irina line.
-      const toIrina = Math.atan2(IRINA[1] - hy, IRINA[0] - hx) * 180 / Math.PI;
-      const start = toIrina + step / 2;
-      team.forEach((w, i) => {
-        const a = (start + i * step) * Math.PI / 180;
-        pos[w.role] = [hx + RING_R * Math.cos(a), hy + RING_R * Math.sin(a)];
-      });
-    });
-
-    return { pos, hubOf, cfos };
+  // ---- a deterministic seed per seat. FNV-1a over the role, so a role always
+  // starts in the same place and the settled graph is the same on every render.
+  function seedOf(role) {
+    let h = 2166136261;
+    for (let i = 0; i < role.length; i += 1) {
+      h ^= role.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0) / 4294967296;
   }
 
-  function innerFlow(w, h) {
-    const bw = 34, bh = 20, gap = 5;
-    const total = PARTS.length * bw + (PARTS.length - 1) * gap;
+  // ---- the layout: a force simulation, then a settle. No library — 24 nodes
+  // and ~65 edges do not need one, and this file may not have dependencies.
+  let cache = { key: "", result: null };
+
+  function simulate(dep) {
+    const links = dep.edges.map((e) => [e.src, e.dst, 300, 0.9]);
+    peerPairs(dep).forEach(([a, b]) => links.push([a, b, 210, 0.22]));
+
+    const nodes = dep.seats.map((s, i) => {
+      const r = seedOf(s.role);
+      const a = (i / dep.seats.length) * Math.PI * 2 + r * 1.4;
+      const rad = s.ring === 0 ? 0 : 260 + r * 260;
+      const [w, h] = NODE[s.ring];
+      return { role: s.role, ring: s.ring, w, h,
+               x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: 0, vy: 0 };
+    });
+    const by = {};
+    nodes.forEach((n) => { by[n.role] = n; });
+    const springs = links.map(([a, b, len, k]) => [by[a], by[b], len, k])
+      .filter((l) => l[0] && l[1]);
+
+    const REP = 900000, DAMP = 0.82, STEPS = 420;
+    for (let step = 0; step < STEPS; step += 1) {
+      const cool = 1 - step / STEPS;
+
+      for (let i = 0; i < nodes.length; i += 1) {
+        for (let j = i + 1; j < nodes.length; j += 1) {
+          const a = nodes[i], b = nodes[j];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const d2 = dx * dx + dy * dy || 1;
+          const d = Math.sqrt(d2);
+          const f = REP / d2;
+          const fx = (dx / d) * f, fy = (dy / d) * f;
+          a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+        }
+      }
+
+      springs.forEach(([a, b, len, k]) => {
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        const f = (d - len) * k * 0.02;
+        const fx = (dx / d) * f, fy = (dy / d) * f;
+        a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+      });
+
+      nodes.forEach((n) => {
+        // Irina is held near the middle; everyone else only drifts back.
+        const pull = n.ring === 0 ? 0.09 : 0.006;
+        n.vx -= n.x * pull; n.vy -= n.y * pull;
+        n.x += n.vx * cool; n.y += n.vy * cool;
+        n.vx *= DAMP; n.vy *= DAMP;
+      });
+
+      // Separate rectangles last, so the settle cannot leave cards overlapping.
+      for (let pass = 0; pass < 2; pass += 1) {
+        for (let i = 0; i < nodes.length; i += 1) {
+          for (let j = i + 1; j < nodes.length; j += 1) {
+            const a = nodes[i], b = nodes[j];
+            const dx = b.x - a.x, dy = b.y - a.y;
+            const ox = (a.w + b.w) / 2 + 26 - Math.abs(dx);
+            const oy = (a.h + b.h) / 2 + 26 - Math.abs(dy);
+            if (ox <= 0 || oy <= 0) continue;
+            if (ox < oy) {
+              const s = (dx >= 0 ? 1 : -1) * ox * 0.5;
+              a.x -= s; b.x += s;
+            } else {
+              const s = (dy >= 0 ? 1 : -1) * oy * 0.5;
+              a.y -= s; b.y += s;
+            }
+          }
+        }
+      }
+    }
+    return { nodes, by };
+  }
+
+  function layout(dep) {
+    const key = dep.seats.map((s) => `${s.role}:${s.built ? 1 : 0}`).join("|");
+    if (cache.key !== key) cache = { key, result: simulate(dep) };
+    return cache.result;
+  }
+
+  function innerFlow(w, h, ring) {
+    const total = PARTS.length * PART_W + (PARTS.length - 1) * PART_GAP;
     const x0 = (w - total) / 2;
-    const y = h - bh - 8;
+    const y = h - PART_H - 12;
     return PARTS.map((p, i) => {
-      const x = x0 + i * (bw + gap);
+      const x = x0 + i * (PART_W + PART_GAP);
       return `<g class="dep-part" data-part="${p.key}">`
-        + `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="5"/>`
-        + `<text x="${x + bw / 2}" y="${y + bh / 2 + 4}" text-anchor="middle">${p.label}</text>`
+        + `<rect x="${x}" y="${y}" width="${PART_W}" height="${PART_H}" rx="7"/>`
+        + `<text x="${x + PART_W / 2}" y="${y + PART_H / 2 + 5}" text-anchor="middle" `
+        + `font-size="${ring === 0 ? 16 : 15}">${p.label}</text>`
         + `</g>`;
     }).join("");
   }
@@ -155,15 +231,21 @@
   function card(s, x, y) {
     const [w, h] = NODE[s.ring];
     const cls = `dep-node dep-r${s.ring} ${s.built ? "built" : "cold"}`;
-    const max = s.ring === 0 ? 30 : s.ring === 1 ? 26 : 21;
+    const max = s.ring === 0 ? 26 : s.ring === 1 ? 22 : 19;
+    const size = TITLE[s.ring];
     const lines = wrap(s.title, max);
-    const firstY = s.ring === 0 ? 30 : lines.length > 1 ? 18 : 24;
+    const step = size + 5;
+    const flowTop = h - PART_H - 12;
+    const first = lines.length > 1
+      ? flowTop / 2 - step / 2 + size * 0.35
+      : flowTop / 2 + size * 0.35;
     const title = lines.map((ln, i) =>
-      `<text class="dep-title" x="${w / 2}" y="${firstY + i * 14}" text-anchor="middle">`
-      + `${esc(ln)}</text>`).join("");
-    return `<g class="${cls}" data-seat="${s.role}" transform="translate(${x - w / 2},${y - h / 2})">`
-      + `<rect class="dep-card" width="${w}" height="${h}" rx="10"/>`
-      + title + innerFlow(w, h)
+      `<text class="dep-title" x="${w / 2}" y="${first + i * step}" text-anchor="middle" `
+      + `font-size="${size}">${esc(ln)}</text>`).join("");
+    return `<g class="${cls}" data-seat="${s.role}" `
+      + `transform="translate(${x - w / 2},${y - h / 2})">`
+      + `<rect class="dep-card" width="${w}" height="${h}" rx="13"/>`
+      + title + innerFlow(w, h, s.ring)
       + `</g>`;
   }
 
@@ -189,57 +271,145 @@
     return out;
   }
 
+  // ---- the view. Module state, so a 5s re-render keeps the reader's zoom.
+  let view = null;
+
+  function bounds(nodes) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    nodes.forEach((n) => {
+      x0 = Math.min(x0, n.x - n.w / 2); y0 = Math.min(y0, n.y - n.h / 2);
+      x1 = Math.max(x1, n.x + n.w / 2); y1 = Math.max(y1, n.y + n.h / 2);
+    });
+    return { x0, y0, x1, y1 };
+  }
+
+  function fit(nodes) {
+    const b = bounds(nodes);
+    view = { x: b.x0 - PAD, y: b.y0 - PAD,
+             w: (b.x1 - b.x0) + PAD * 2, h: (b.y1 - b.y0) + PAD * 2 };
+  }
+
+  function paintView(svg) {
+    if (!svg || !view) return;
+    svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`);
+  }
+
+  function zoomAt(svg, factor, fx, fy) {
+    const next = Math.max(view.w / 12, Math.min(view.w * 6, view.w * factor));
+    const k = next / view.w;
+    view.x += (view.w - next) * fx;
+    view.y += (view.h - view.h * k) * fy;
+    view.w = next;
+    view.h *= k;
+    paintView(svg);
+  }
+
+  function attachZoom(svg, nodes) {
+    if (!svg) return;
+    if (!view) fit(nodes);
+    paintView(svg);
+
+    svg.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const r = svg.getBoundingClientRect();
+      zoomAt(svg, Math.exp(e.deltaY * 0.0012),
+             (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+    }, { passive: false });
+
+    let drag = null;
+    svg.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      drag = { x: e.clientX, y: e.clientY };
+      svg.classList.add("panning");
+      svg.setPointerCapture(e.pointerId);
+    });
+    svg.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      const r = svg.getBoundingClientRect();
+      view.x -= (e.clientX - drag.x) * (view.w / r.width);
+      view.y -= (e.clientY - drag.y) * (view.h / r.height);
+      drag = { x: e.clientX, y: e.clientY };
+      paintView(svg);
+    });
+    const stop = (e) => {
+      drag = null;
+      svg.classList.remove("panning");
+      try { svg.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+    };
+    svg.addEventListener("pointerup", stop);
+    svg.addEventListener("pointercancel", stop);
+  }
+
+  function zoomBar() {
+    return `<div class="dep-bar">
+      <span class="dep-hint">drag to pan &middot; scroll to zoom &middot; click a seat to
+        open its panel</span>
+      <div class="dep-zoom">
+        <button type="button" data-zoom="in" title="Zoom in">+</button>
+        <button type="button" data-zoom="out" title="Zoom out">-</button>
+        <button type="button" data-zoom="fit" title="Fit the whole graph">fit</button>
+      </div></div>`;
+  }
+
+  function wireZoomBar(nodes) {
+    const svg = document.querySelector("svg.dep");
+    if (!svg) return;
+    document.querySelectorAll(".dep-zoom button").forEach((b) => {
+      b.onclick = () => {
+        const how = b.getAttribute("data-zoom");
+        if (how === "fit") { fit(nodes); paintView(svg); return; }
+        zoomAt(svg, how === "in" ? 1 / 1.35 : 1.35, 0.5, 0.5);
+      };
+    });
+  }
+
   function departmentSVG(dep) {
     const L = layout(dep);
     const p = [];
     const seatBy = (role) => dep.seats.find((s) => s.role === role);
-
-    // the circles the workers sit on
-    Object.values(L.hubOf).forEach(([hx, hy]) => {
-      p.push(`<circle class="dep-wheel" cx="${hx}" cy="${hy}" r="${RING_R}"/>`);
-    });
+    const at = (role) => L.by[role];
 
     // lateral edges first, so the delegation edges draw on top of them
     peerPairs(dep).forEach(([a, b]) => {
-      const pa = L.pos[a], pb = L.pos[b];
+      const pa = at(a), pb = at(b);
       if (!pa || !pb) return;
-      const [aw, ah] = NODE[seatBy(a).ring];
-      const [bw, bh] = NODE[seatBy(b).ring];
-      const [x0, y0] = edgePoint(pa[0], pa[1], aw / 2, ah / 2, pb[0], pb[1]);
-      const [x1, y1] = edgePoint(pb[0], pb[1], bw / 2, bh / 2, pa[0], pa[1]);
+      const [x0, y0] = edgePoint(pa.x, pa.y, pa.w / 2, pa.h / 2, pb.x, pb.y);
+      const [x1, y1] = edgePoint(pb.x, pb.y, pb.w / 2, pb.h / 2, pa.x, pa.y);
       p.push(`<line class="dep-edge dep-peer" data-src="${a}" data-dst="${b}" `
-        + `x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>`);
+        + `x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" `
+        + `y2="${y1.toFixed(1)}"/>`);
     });
 
     dep.edges.forEach((e) => {
-      const a = L.pos[e.src], b = L.pos[e.dst];
-      if (!a || !b) return;
-      const [sw, sh] = NODE[seatBy(e.src).ring];
-      const [dw, dh] = NODE[seatBy(e.dst).ring];
-      const [x0, y0] = edgePoint(a[0], a[1], sw / 2, sh / 2, b[0], b[1]);
-      const [x1, y1] = edgePoint(b[0], b[1], dw / 2, dh / 2, a[0], a[1]);
+      const pa = at(e.src), pb = at(e.dst);
+      if (!pa || !pb) return;
+      const [x0, y0] = edgePoint(pa.x, pa.y, pa.w / 2, pa.h / 2, pb.x, pb.y);
+      const [x1, y1] = edgePoint(pb.x, pb.y, pb.w / 2, pb.h / 2, pa.x, pa.y);
       p.push(`<line class="dep-edge" data-src="${e.src}" data-dst="${e.dst}" `
-        + `x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>`);
+        + `x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" `
+        + `y2="${y1.toFixed(1)}"/>`);
     });
 
     dep.seats.forEach((s) => {
-      const [x, y] = L.pos[s.role];
-      p.push(card(s, x, y));
+      const n = at(s.role);
+      if (n) p.push(card(s, n.x, n.y));
     });
 
-    return `<div class="dep-wrap"><svg class="dep" viewBox="0 0 ${W} ${H}" role="img"`
-      + ` aria-label="The department: ${dep.seats.length} seats, each holding its own flow"`
-      + `>${p.join("")}</svg></div>`;
+    // The viewBox is set by attachZoom after this markup lands, so the graph is
+    // fitted to its own bounds rather than to a fixed canvas.
+    return `<div class="dep-wrap"><svg class="dep" preserveAspectRatio="xMidYMid meet"`
+      + ` role="img" aria-label="The department: ${dep.seats.length} seats and their edges"`
+      + `>${p.join("")}</svg></div>` + zoomBar();
   }
 
   function legend() {
     return `<div class="dep-legend">`
       + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent,#1e4e8c)"></i>Irina</span>`
-      + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent-soft,#eaf2fb)"></i>CFO - the hub of its wheel</span>`
-      + `<span class="dep-key"><i class="dep-swatch"></i>worker - on the circle</span>`
+      + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent-soft,#eaf2fb)"></i>CFO</span>`
+      + `<span class="dep-key"><i class="dep-swatch"></i>worker</span>`
       + `<span class="dep-key">every seat holds the same flow: gate - llm - tool - out</span>`
-      + `<span class="dep-key">solid spoke = delegation, one level down</span>`
-      + `<span class="dep-key">faint chord = peers (they may consult each other); it lights when they do</span>`
+      + `<span class="dep-key">solid line = delegation, one level down</span>`
+      + `<span class="dep-key">dashed line = peers; it lights when they consult</span>`
       + `</div>`;
   }
 
@@ -306,8 +476,6 @@
     const u = d.usage || {};
     const rows = u.by_seat || [];
     if (!rows.length) return "";
-    // `table()` maps over an ARRAY of <tr> strings; handing it a joined string
-    // threw "rows.map is not a function" and killed the whole view render.
     const body = rows.map((b) => `<tr>
         <td><code>${esc(b.seat)}</code></td>
         <td class="meta">${b.calls || 0}</td>
@@ -376,17 +544,21 @@
 
   VIEWS.department = (d) => {
     const dep = d.department;
-    const head = `<div class="meta" style="margin-bottom:var(--space-3)">Twenty-four seats, four
-      wheels. Each CFO is the hub of its own circle, its workers on the rim, one spoke to each.
-      Every seat is a full waku agent, so every block holds the same inner flow -
-      <b>gate - llm - tool - out</b> - and the part that is working <b>beats</b>. Driven by the
-      trace, so a turn started in the CLI or the dock animates here too.</div>`;
+    const head = `<div class="meta" style="margin-bottom:var(--space-3)">Twenty-four seats on
+      waku, laid out by force rather than by hand: nodes push each other apart, edges pull their
+      ends together, and the teams cluster because their edges are denser. Every seat is a full
+      waku agent, so every block holds the same inner flow -
+      <b>gate - llm - tool - out</b> - and the part that is working <b>beats</b>.</div>`;
     if (!dep) return head + uiCard(`<span class="empty">no department payload</span>`);
     const built = dep.seats.filter((s) => s.built).length;
-    setTimeout(paint, 0);   // re-apply beats after this render replaces the DOM
+    const L = layout(dep);
+    // After the DOM swaps in: re-apply the beats, and re-attach the view so a
+    // refresh keeps the reader's zoom and pan.
+    setTimeout(() => { paint(); attachZoom(document.querySelector("svg.dep"), L.nodes);
+                       wireZoomBar(L.nodes); }, 0);
     return head + departmentSVG(dep) + legend()
       + uiCard(`<div class="meta">${built} of ${dep.seats.length} seats have run &middot;
-        ${dep.edges.length} spokes. Grey = never used.</div>`)
+        ${dep.edges.length} delegation edges. Grey = never used.</div>`)
       + seatsTable(dep);
   };
 })();
