@@ -38,6 +38,19 @@
   // reader lands on always has legible text.
   const MIN_SCALE = 0.62;
 
+  // An expanded seat, in place. One size for every ring: the point of expanding
+  // is to see the flow run, and a bigger card for a CFO would only change how
+  // much empty space sits around the same four boxes.
+  const OPEN_W = 660, OPEN_H = 300;
+
+  // Which seat is open, if any. Module state, because the view is rebuilt from
+  // scratch every few seconds and the expansion has to survive that.
+  let expanded = null;
+
+  function sizeOf(seat) {
+    return seat.role === expanded ? [OPEN_W, OPEN_H] : NODE[seat.ring];
+  }
+
   // The four stages drawn inside every seat, left to right, each mapped to the
   // trace event that lights it — the same idea as diagram.js's STAGE map.
   const PARTS = [
@@ -92,6 +105,14 @@
   .dep-swatch{width:14px;height:10px;border-radius:3px;border:1.3px solid var(--border,#2e6db4)}
   .dep-seat-head{padding-bottom:var(--space-4);margin-bottom:var(--space-4);
     border-bottom:var(--rule-width) solid var(--rule)}
+  .dep-open .dep-card{stroke-width:2.4}
+  .dep-meta{fill:var(--text-muted);font-family:inherit}
+  .dep-fact{fill:var(--text-muted);font-family:inherit}
+  .dep-fact-k{fill:var(--text-faint);font-family:var(--face-mono);font-size:0.82em;
+    letter-spacing:0.1em}
+  .dep-close{fill:var(--text-faint);font-family:inherit}
+  .dep-arrow{stroke:var(--border,#9dc2e8);stroke-width:2;fill:none}
+  .dep-arrow-head{fill:var(--border,#9dc2e8)}
   .dep-seat-name{font-size:var(--text-lg);font-weight:600;letter-spacing:-0.01em;
     line-height:var(--leading-snug);margin-bottom:var(--space-2)}
   .dep-kvs{display:flex;flex-wrap:wrap;gap:var(--space-6);margin-top:var(--space-4)}
@@ -159,7 +180,7 @@
       const r = seedOf(s.role);
       const a = (i / dep.seats.length) * Math.PI * 2 + r * 1.4;
       const rad = s.ring === 0 ? 0 : 260 + r * 260;
-      const [w, h] = NODE[s.ring];
+      const [w, h] = sizeOf(s);
       return { role: s.role, ring: s.ring, w, h,
                x: Math.cos(a) * rad, y: Math.sin(a) * rad, vx: 0, vy: 0 };
     });
@@ -233,7 +254,10 @@
   }
 
   function layout(dep) {
-    const key = dep.seats.map((s) => `${s.role}:${s.built ? 1 : 0}`).join("|");
+    // The open seat changes the sizes, so it is part of the key: expanding one
+    // re-runs the settle and the neighbours move aside for it.
+    const key = dep.seats.map((s) => `${s.role}:${s.built ? 1 : 0}`).join("|")
+      + "|" + (expanded || "");
     if (cache.key !== key) cache = { key, result: simulate(dep) };
     return cache.result;
   }
@@ -252,7 +276,55 @@
     }).join("");
   }
 
+  // The open seat: the same card, large enough to read the flow and to carry the
+  // facts that actually differ between seats. Every seat is a Waku, so the
+  // diagram is identical for all of them — the role, the tools, the memory and
+  // the spend are what make this one this one.
+  function openCard(s, x, y) {
+    const d = latest || {};
+    const db = ((d.db && d.db.seats) || []).find((r) => r.seat === s.role) || {};
+    const use = ((d.usage && d.usage.by_seat) || []).find((r) => r.seat === s.role) || {};
+    const cls = `dep-node dep-r${s.ring} dep-open ${s.built ? "built" : "cold"}`;
+
+    const bw = 120, bh = 64, gap = 26;
+    const total = PARTS.length * bw + (PARTS.length - 1) * gap;
+    const x0 = (OPEN_W - total) / 2;
+    const y0 = 96;
+    const flow = PARTS.map((p, i) => {
+      const bx = x0 + i * (bw + gap);
+      const ax = bx + bw + 4, ay = y0 + bh / 2;
+      const arrow = i < PARTS.length - 1
+        ? `<path class="dep-arrow" d="M${ax},${ay} l${gap - 13},0"/>`
+          + `<path class="dep-arrow-head" d="M${ax + gap - 13},${ay - 5} l7,5 l-7,5 z"/>`
+        : "";
+      return arrow + `<g class="dep-part" data-part="${p.key}">`
+        + `<rect x="${bx}" y="${y0}" width="${bw}" height="${bh}" rx="12"/>`
+        + `<text x="${bx + bw / 2}" y="${y0 + bh / 2 + 6}" text-anchor="middle" `
+        + `font-size="19">${p.label}</text></g>`;
+    }).join("");
+
+    const facts = [
+      ["tools", (s.tools || []).join(", ") || "none"],
+      ["memory", `${db.facts || 0} facts · ${db.episodes || 0} episodes · ${kb(db.size || 0)}`],
+      ["spend", `${use.calls || 0} calls · ${money(use.cost || 0)}`],
+    ].map(([k, v], i) =>
+      `<text class="dep-fact" x="30" y="${y0 + bh + 46 + i * 27}" font-size="15">`
+      + `<tspan class="dep-fact-k">${k.toUpperCase()}</tspan>   ${esc(v)}</text>`).join("");
+
+    return `<g class="${cls}" data-seat="${s.role}" `
+      + `transform="translate(${x - OPEN_W / 2},${y - OPEN_H / 2})">`
+      + `<rect class="dep-card" width="${OPEN_W}" height="${OPEN_H}" rx="18"/>`
+      + `<text class="dep-title" x="30" y="44" font-size="25">${esc(s.title)}</text>`
+      + `<text class="dep-meta" x="30" y="70" font-size="14">${esc(s.role)} &middot; `
+      + `ring ${s.ring} &middot; ${s.built ? "has run" : "never used"}</text>`
+      + flow + facts
+      + `<text class="dep-close" x="${OPEN_W - 30}" y="44" text-anchor="end" `
+      + `font-size="15">click to close</text>`
+      + `</g>`;
+  }
+
   function card(s, x, y) {
+    if (s.role === expanded) return openCard(s, x, y);
     const [w, h] = NODE[s.ring];
     const cls = `dep-node dep-r${s.ring} ${s.built ? "built" : "cold"}`;
     const max = s.ring === 0 ? 26 : s.ring === 1 ? 22 : 19;
@@ -430,6 +502,15 @@
     }
   }
 
+  // Expanding happens in the graph, not in a dialog: the card grows where it
+  // sits, the neighbours move aside for it, and the flow inside it keeps beating
+  // while you watch. render() is the router's own function, so the rebuilt view
+  // is the same one every other change goes through.
+  function toggleSeat(role) {
+    expanded = expanded === role ? null : role;
+    if (typeof render === "function") render();
+  }
+
   function attachZoom(svg, nodes) {
     if (!svg) return;
     if (!view) fit(svg, nodes);
@@ -476,7 +557,7 @@
       const under = typeof document.elementFromPoint === "function"
         ? document.elementFromPoint(e.clientX, e.clientY) : e.target;
       const node = under && under.closest ? under.closest(".dep-node") : null;
-      if (node) openSeat(node.getAttribute("data-seat"));
+      if (node) toggleSeat(node.getAttribute("data-seat"));
     };
     svg.addEventListener("pointerup", stop);
     svg.addEventListener("pointercancel", stop);
@@ -490,12 +571,20 @@
       e.preventDefault();
       openSeat(under.getAttribute("data-seat"));
     });
+
+    // Double-click asks for the other thing: the whole architecture chart, in a
+    // dialog, rather than the flow in place. The two clicks either side of it
+    // have already toggled the expansion, so it ends where it started.
+    svg.addEventListener("dblclick", (e) => {
+      const under = e.target && e.target.closest ? e.target.closest(".dep-node") : null;
+      if (under) openSeat(under.getAttribute("data-seat"));
+    });
   }
 
   function zoomBar() {
     return `<div class="dep-bar">
-      <span class="dep-hint">drag to pan &middot; scroll to zoom &middot; click a seat for
-        its architecture</span>
+      <span class="dep-hint">drag to pan &middot; scroll to zoom &middot; click a seat to open
+        it here &middot; right-click or double-click for its full architecture</span>
       <div class="dep-zoom">
         <button type="button" data-zoom="in" title="Zoom in">+</button>
         <button type="button" data-zoom="out" title="Zoom out">-</button>
