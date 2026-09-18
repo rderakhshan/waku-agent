@@ -692,13 +692,11 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
   border-bottom:3.5px solid transparent;
   transform:rotate(90deg);transition:transform 140ms ease}
 .r-fold[aria-expanded="false"] .r-caret{transform:rotate(0)}
-/* Closed: the pages it holds are gone. Keyed off the fold's own aria-expanded,
-   which is in the markup, so they are hidden on the FIRST paint rather than a
-   moment after layout.js runs. The anchors are siblings of the fold row, which
-   is what lets a sibling combinator reach them with no wrapper between.
-   A page you are ON is never left hidden; layout.js opens the fold on arrival. */
-.r-fold[aria-expanded="false"] ~ a[data-grp="llmops"]{display:none}
-/* Icon-only rail: no room for a fold control, so show them as monograms, which
-   is all a collapsed rail shows anyway. Same specificity as the rule above, so
-   this one has to come second. */
-.rail.collapsed a[data-grp="llmops"]{display:flex}
+/* A fold's rows carry `hidden` in the markup, so they are gone on the FIRST
+   paint rather than a moment after layout.js runs. waku styles `.rail > a` as a
+   flex row, which would beat the browser's own rule for [hidden], so it is
+   stated here with the weight to win. */
+.rail > a[hidden]{display:none}
+/* Icon-only rail: no room for a fold control, so show the rows as monograms,
+   which is all a collapsed rail shows anyway. */
+.rail.collapsed > a[hidden]{display:flex}

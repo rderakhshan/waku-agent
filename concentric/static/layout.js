@@ -70,64 +70,70 @@
   };
 })();
 
-// The LLMOps fold: the cockpit pages fold away behind one row.
+// The rail's folds: each one's pages fold away behind a single row.
 //
-// waku's rail has no nesting beyond its section headings, so the fold IS the
-// heading — same type, same rule — plus a caret and a click. aria-expanded on
-// the row is the single source of state: the stylesheet keys off it and so does
-// this file, so there is no second copy to drift.
+// waku's rail has no nesting beyond its section headings, so a fold IS the
+// heading — same type, same rule — plus a caret and a click. Every fold in the
+// markup is picked up by class, so adding another is a change to dashboard.py
+// alone; nothing here names a group.
+//
+// The rows carry their own `hidden`, which is what the server shipped them with,
+// so a fold is already closed on the first paint. This file only ever flips that
+// attribute and the fold's aria-expanded.
 //
 // It runs after main.js, so the rail is parsed and main.js has already bound its
-// own handlers. The fold does not touch them: main.js lights the current page by
+// own handlers. The folds do not touch them: main.js lights the current page by
 // class on the anchors, and hiding an anchor does not stop that.
 (function () {
-  const fold = document.getElementById("llmops");
-  if (!fold) return;
+  const folds = [...document.querySelectorAll(".r-fold")];
+  if (!folds.length) return;
 
-  // The pages the fold holds. Arriving at one must never leave it hidden behind
-  // a closed fold, so these open it.
-  const INSIDE = new Set(["gateway", "loop", "graph", "memory", "tools",
-                          "database", "ops", "compare"]);
-  const KEY = "llmopsOpen";
+  const groups = folds.map((fold) => {
+    const key = fold.id;
+    const rows = [...document.querySelectorAll(`a[data-grp="${key}"]`)];
+    // Which views this fold holds. The first path segment, because two rows can
+    // share a view (#compare/models and #compare/memory are both "compare").
+    const views = new Set(rows.map(
+      (a) => (a.getAttribute("href") || "").slice(1).split("/")[0]));
+    const store = `fold:${key}`;
 
-  // aria-expanded IS the state — the stylesheet hides the pages off it, so
-  // setting the attribute is the whole change.
-  function set(open) {
-    fold.setAttribute("aria-expanded", open ? "true" : "false");
-  }
-
-  // The reader's own choice, in memory as well as in storage: reveal() needs to
-  // put the rail back the way they left it.
-  let pref = false;
-  try { pref = localStorage.getItem(KEY) === "1"; } catch (e) { /* private mode */ }
-  set(pref);   // closed until the reader says otherwise
-
-  function store(open) {
-    pref = open;
-    try { localStorage.setItem(KEY, open ? "1" : "0"); }
+    // The reader's own choice, in memory as well as in storage: sync() needs to
+    // put the rail back the way they left it.
+    let pref = false;
+    try { pref = localStorage.getItem(store) === "1"; }
     catch (e) { /* private mode: the fold simply will not remember */ }
-  }
 
-  function toggle() {
-    const open = fold.getAttribute("aria-expanded") !== "true";
-    set(open);
-    store(open);
-  }
+    const set = (open) => {
+      fold.setAttribute("aria-expanded", open ? "true" : "false");
+      rows.forEach((a) => { a.hidden = !open; });
+    };
 
-  fold.addEventListener("click", toggle);
-  fold.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    const toggle = () => {
+      const open = fold.getAttribute("aria-expanded") !== "true";
+      pref = open;
+      set(open);
+      try { localStorage.setItem(store, open ? "1" : "0"); }
+      catch (e) { /* private mode */ }
+    };
+
+    fold.addEventListener("click", toggle);
+    fold.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+    });
+
+    set(pref);   // closed until the reader says otherwise
+    return { views, set, pref: () => pref };
   });
 
-  // The fold follows where you are: forced open on a page it holds, so a page is
+  // Each fold follows where you are: forced open on a page it holds, so a page is
   // never hidden behind a closed fold, and otherwise put back to the reader's own
   // choice. Arriving somewhere is not itself a preference — opening on arrival is
   // deliberately not stored, or one visit to Memory would un-shorten the rail for
   // good. Only a click is.
-  const reveal = () => {
+  const sync = () => {
     const view = (location.hash || "").slice(1).split("/")[0];
-    set(INSIDE.has(view) ? true : pref);
+    groups.forEach((g) => g.set(g.views.has(view) ? true : g.pref()));
   };
-  reveal();
-  window.addEventListener("hashchange", reveal);
+  sync();
+  window.addEventListener("hashchange", sync);
 })();
