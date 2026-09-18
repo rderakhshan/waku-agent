@@ -262,9 +262,85 @@ SLOTS: tuple[dict[str, Any], ...] = (
 )
 
 
+# What each metric is a property of. This is the taxonomy's own indexing: a
+# formula that carries an agent index (Delta^i, a^i_r) is `agent`, one that
+# compares two agents (s^1 . s^2, avg_{i<j}) is `pair`, and one that belongs to
+# the harness, the department as a whole, or a labeler is `system`.
+#
+# It is a separate map rather than a field on each slot because the slot list is
+# long and this is the one thing worth reading in one place — the shape of the
+# whole registry at a glance.
+LEVELS: dict[str, str] = {
+    # the taxonomy's Performance and Task Completion
+    "success_rate": "agent",
+    "tool_use_accuracy": "agent",
+    "average_reward": "agent",
+    "pass_at_k": "agent",
+    # grounding and retention
+    "hallucination_rate": "agent",
+    "factual_grounding": "agent",
+    "context_retention": "agent",
+    # System and Human-Centric, indexed by agent
+    "latency_avg": "agent",
+    "latency_p95": "agent",
+    "throughput": "agent",
+    "tokens_in": "agent",
+    "tokens_out": "agent",
+    "cost": "agent",
+    "tool_errors": "agent",
+    # harness-level
+    "gate_retrieval_ratio": "system",
+    "cost_per_ring": "system",
+    "context_growth": "system",
+    # MAST, split by which layer owns the failure
+    "step_repetition": "agent",
+    "premature_terminations": "agent",
+    "mandate_breaches": "agent",
+    "unanswered_handoffs": "pair",
+    "mast_reasoning_action_mismatch": "pair",
+    "mast_information_withholding": "pair",
+    "mast_annotator_agreement": "system",
+    # structure and interaction
+    "delegation_depth": "system",
+    "delegation_breadth": "system",
+    "handoff_latency": "pair",
+    "consultations": "pair",
+    "peer_pairs_used": "pair",
+    # memory
+    "memory_growth": "agent",
+    "fact_writers": "agent",
+    "seats_without_memory": "agent",
+    "idle_seats": "agent",
+    "consolidation_backlog": "system",
+    # psychometric
+    "argument_confidence": "agent",
+    "cognitive_effort": "agent",
+    "cognitive_dissonance": "agent",
+    "empathy": "agent",
+    # preference
+    "preference_rate": "pair",
+    "sus": "system",
+    # semantic
+    "stance_convergence": "pair",
+    "stance_shift": "agent",
+    "semantic_diversity": "pair",
+    "bertscore": "agent",
+    "bleu_rouge_meteor": "agent",
+    # benchmarks score one agent on a task
+    "bench_code": "agent",
+    "bench_agentic": "agent",
+    "bench_general": "agent",
+    "bench_math": "agent",
+    "bench_domain": "agent",
+    "bench_multimodal": "agent",
+    "bench_task_selection": "system",
+}
+
+
 def registry() -> dict[str, dict]:
     """A fresh copy of the slots, keyed by id."""
-    return {slot["id"]: {**slot, "value": None, "cost_ms": None, "as_of": None}
+    return {slot["id"]: {**slot, "level": LEVELS.get(slot["id"], "system"),
+                         "value": None, "cost_ms": None, "as_of": None}
             for slot in SLOTS}
 
 
@@ -1068,6 +1144,52 @@ def apply_report(reg: dict[str, dict], report: dict) -> int:
             reg[mid]["as_of"] = ran_at
             applied += 1
     return applied
+
+
+def _by_seat(events: list[dict], fn, unit=None) -> dict | None:
+    """Run `fn` once per seat instead of once for the department.
+
+    This is the whole per-agent mechanism. Every metric helper already takes a
+    list of events; grouping first turns it into 24 answers instead of one, and
+    a department mean is where the answer to "which seat?" goes to die.
+
+    `unit` counts the sample the number is drawn from — the llm calls behind a
+    latency, the tool calls behind a repeat. It travels with the value because a
+    mean over two turns and a mean over forty are not the same claim, and a page
+    that shows them side by side without saying so invites a wrong conclusion.
+    """
+    groups: dict[str, list[dict]] = {}
+    for ev in events:
+        role = ev.get("role")
+        if role:
+            groups.setdefault(role, []).append(ev)
+    out: dict[str, dict] = {}
+    for seat, group in groups.items():
+        value = fn(group)
+        if value is None:
+            continue
+        out[seat] = {"value": value,
+                     "n": sum(1 for e in group if unit(e)) if unit else len(group)}
+    return out or None
+
+
+def _by_pair(events: list[dict], fn) -> dict | None:
+    """Run `fn(events, caller, target)` once per interacting pair.
+
+    Pairs are siblings of seats, not children: a hand-off's latency cannot be
+    recovered from either seat's own mean, so this reads the same event list
+    rather than the per-seat results.
+    """
+    out: dict[str, Any] = {}
+    for src, dst, _ in _delegations(events):
+        if not src or not dst or src == dst:
+            continue
+        key = f"{src}>{dst}"
+        if key not in out:
+            value = fn(events, src, dst)
+            if value is not None:
+                out[key] = value
+    return out or None
 
 
 # --- the eval and arena inputs -----------------------------------------------

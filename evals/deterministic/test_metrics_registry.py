@@ -17,7 +17,8 @@ from __future__ import annotations
 from concentric import metrics
 
 REQUIRED = ("id", "label", "state", "kind", "changes", "unit", "direction",
-            "source", "filler", "value", "cost_ms", "as_of")
+            "source", "filler", "value", "cost_ms", "as_of", "level")
+LEVELS = {"agent", "pair", "system"}
 STATES = {"computed", "ready", "blocked", "placeholder"}
 
 # One turn with a delegate that was never answered, one repeated tool call, and
@@ -64,6 +65,39 @@ def test_every_slot_has_every_field():
         missing = [k for k in REQUIRED if k not in slot]
         assert not missing, f"{slot.get('id')} is missing {missing}"
         assert slot["state"] in STATES, f"{slot['id']} has state {slot['state']!r}"
+
+
+def test_every_slot_declares_what_it_is_a_property_of():
+    """The taxonomy indexes most of its formulas by agent (Delta^i, a^i_r) or by
+    pair (s^1 . s^2, avg_{i<j}). A slot that does not say which level it belongs
+    to is a slot that gets aggregated wrongly — which is exactly what happened
+    the first time, when every one of them became a department mean."""
+    for slot in metrics.compute(CTX).values():
+        assert slot.get("level") in LEVELS, f"{slot['id']} has no level"
+
+
+def test_no_slot_is_missing_from_the_level_map():
+    """LEVELS is a separate map so the shape of the whole registry reads in one
+    place. A missing key would fall back to system — a wrong answer, quietly,
+    which is the failure mode this whole module exists to avoid."""
+    declared = {slot["id"] for slot in metrics.SLOTS}
+    assert declared == set(metrics.LEVELS), (
+        f"missing: {sorted(declared - set(metrics.LEVELS))}; "
+        f"extra: {sorted(set(metrics.LEVELS) - declared)}")
+
+
+def test_the_taxonomys_agent_indexed_metrics_are_marked_agent():
+    """A spot check against the formulas themselves. These four carry an agent
+    index in the source, so a `system` here would mean the registry is measuring
+    the department and calling it an agent again."""
+    reg = metrics.compute(CTX)
+    for mid in ("latency_avg", "tool_errors", "step_repetition",
+                "mandate_breaches", "stance_shift"):
+        assert reg[mid]["level"] == "agent", mid
+    # and these compare two agents in the source
+    for mid in ("stance_convergence", "semantic_diversity", "handoff_latency",
+                "unanswered_handoffs"):
+        assert reg[mid]["level"] == "pair", mid
 
 
 def test_slot_ids_are_unique():

@@ -192,6 +192,44 @@
     return uiCard(body.join(""), { title: "Needs attention" });
   }
 
+  // A per-seat or per-pair value renders as a table, not one number. Sorted
+  // worst-first, because that is the entire reason for splitting a department
+  // mean back into its seats: "23 repeats" becomes "audit-planner repeated 9".
+  //
+  // `n` rides every row. A mean over two turns and a mean over forty are not the
+  // same claim, and showing them side by side without saying so invites a wrong
+  // conclusion.
+  function seriesTable(value, direction, unit) {
+    const rows = Object.entries(value).map(([key, cell]) => {
+      const isCell = cell && typeof cell === "object";
+      return { key, v: isCell ? cell.value : cell, n: isCell ? cell.n : null };
+    });
+    if (!rows.length) return `<span class="meta">nothing to show</span>`;
+    const num = (x) => (typeof x === "number" ? x : Number(x));
+    if (direction === "lower") rows.sort((a, b) => num(b.v) - num(a.v));
+    else if (direction === "higher") rows.sort((a, b) => num(a.v) - num(b.v));
+    else rows.sort((a, b) => String(a.key).localeCompare(String(b.key)));
+    const body = rows.map((r) => `<tr>
+      <td><code>${esc(r.key)}</code></td>
+      <td class="num"><code>${esc(show(r.v))}</code></td>
+      <td class="meta">${r.n == null ? "" : "n=" + esc(r.n)}</td></tr>`).join("");
+    return `<table class="lab-series"><thead><tr>
+      <th>who</th><th>${esc(unit || "")}</th><th></th></tr></thead>
+      <tbody>${body}</tbody></table>`;
+  }
+
+  function valueCell(s) {
+    if (s.value === null || s.value === undefined) {
+      return `<code>—</code> <span class="lab-row-unit">${esc(s.unit)}</span>`;
+    }
+    if (typeof s.value === "object") {
+      return seriesTable(s.value, s.direction, s.unit);
+    }
+    return `<code>${esc(show(s.value))}</code>
+      <span class="lab-row-unit">${esc(s.unit)}</span>
+      ${s.as_of ? `<span class="lab-row-asof">run ${esc(ago(s.as_of))}</span>` : ""}`;
+  }
+
   function lensCard([name, question, ids], m) {
     const slots = ids.map((id) => m[id]).filter(Boolean);
     if (!slots.length) return "";
@@ -200,9 +238,7 @@
           <span class="lab-row-label">${esc(s.label)}</span>
           ${stateBadge(s)}
         </div>
-        <div class="lab-row-value"><code>${esc(show(s.value))}</code>
-          <span class="lab-row-unit">${esc(s.unit)}</span>
-          ${s.as_of ? `<span class="lab-row-asof">run ${esc(ago(s.as_of))}</span>` : ""}</div>
+        <div class="lab-row-value">${valueCell(s)}</div>
         ${s.value === null && s.filler
           ? `<div class="lab-row-filler">${esc(s.filler)}</div>` : ""}
       </div>`).join("");
@@ -220,9 +256,8 @@
     ];
     return groups.filter(([, g]) => g.length).map(([title, group]) => {
       const body = group.map((s) => [
-        `<code>${esc(s.id)}</code><div class="meta">${esc(s.label)}</div>`,
-        `<code>${esc(show(s.value))}</code>`
-          + (s.as_of ? `<div class="meta">run ${esc(ago(s.as_of))}</div>` : ""),
+        `<code>${esc(s.id)}</code><div class="meta">${esc(s.label)} · ${esc(s.level)}</div>`,
+        valueCell(s),
         stateBadge(s),
         `<span class="meta">${esc(s.unit)} · ${esc(s.changes)} · `
         + `${esc(s.source)}</span>`,

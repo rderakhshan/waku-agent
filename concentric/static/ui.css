@@ -742,3 +742,15 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .lab-progress{flex-basis:100%;font-family:var(--face-mono);font-size:var(--text-xs);
   color:var(--text-ink);margin-top:var(--space-2)}
 .lab-row-asof{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-faint)}
+
+/* A per-seat or per-pair breakdown. Dense on purpose: the point is to compare
+   rows, and a table is what comparison looks like. */
+.lab-series{width:100%;border-collapse:collapse;font-size:var(--text-sm);margin-top:2px}
+.lab-series th{text-align:left;font-family:var(--face-mono);font-size:var(--text-xs);
+  text-transform:uppercase;letter-spacing:var(--tracking-label);color:var(--text-faint);
+  font-weight:var(--font-weight-medium);padding:2px 8px 2px 0;
+  border-bottom:var(--rule-width) solid var(--rule)}
+.lab-series td{padding:2px 8px 2px 0;border-bottom:var(--rule-width) solid var(--rule)}
+.lab-series td.num{text-align:right;font-variant-numeric:tabular-nums}
+.lab-series tr:last-child td{border-bottom:0}
+.lab-series code{font-family:var(--face-mono);font-size:var(--text-xs)}
