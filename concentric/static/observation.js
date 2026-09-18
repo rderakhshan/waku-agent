@@ -178,7 +178,29 @@
     const lede = parts.length
       ? `Health reads first, because it is the only lens where a number is bad news: ${parts.join("; ")}.`
       : "Health reads clean: no turn stopped early, no hand-off went unanswered, nothing repeated.";
-    return uiCard(`<p class="lab-verdict">${lede}</p>`);
+    // Naming the worst seat here, where a reader stops first, rather than making
+    // them scroll to the tables to find out who it is.
+    const worst = WATCH
+      .map((id) => (m[id] && worstOf(m[id]) ? `${m[id].label}: ${worstOf(m[id])}` : ""))
+      .filter(Boolean);
+    const where = worst.length ? ` The worst single case is ${worst[0]}.` : "";
+    return uiCard(`<p class="lab-verdict">${lede}${where}</p>`);
+  }
+
+  // The worst row of a per-seat or per-pair value — "audit-planner 9". The
+  // department count says something is wrong; this says where to look, which is
+  // the only actionable half.
+  function worstOf(slot) {
+    const v = slot && slot.value;
+    if (!v || typeof v !== "object") return "";
+    const rows = Object.entries(v)
+      .map(([key, cell]) => ({
+        key, n: (cell && typeof cell === "object") ? cell.value : cell,
+      }))
+      .filter((r) => typeof r.n === "number" && r.n > 0);
+    if (!rows.length) return "";
+    rows.sort((a, b) => b.n - a.n);
+    return `${rows[0].key} · ${rows[0].n}`;
   }
 
   function attention(m, rows) {
@@ -188,8 +210,9 @@
     const gaps = rows.filter((s) => s.value === null && s.state !== "placeholder");
     const body = [];
     if (flagged.length) {
-      body.push(table(["what", "count", "unit"], flagged.map((x) => [
+      body.push(table(["what", "count", "worst", "unit"], flagged.map((x) => [
         `<b>${esc(x.slot.label)}</b>`, `<code>${show(x.total)}</code>`,
+        `<code>${esc(worstOf(x.slot))}</code>`,
         `<span class="meta">${esc(x.slot.unit)}</span>`])));
     } else {
       body.push(`<p class="lab-quiet">Nothing in the health instruments is above zero.</p>`);
