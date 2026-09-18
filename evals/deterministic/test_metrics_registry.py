@@ -282,3 +282,48 @@ def test_kappa_is_undefined_when_a_labeler_never_varies():
 def test_kappa_needs_two_lists_of_the_same_length():
     assert metrics.kappa([0, 1], [0]) is None
     assert metrics.kappa([], []) is None
+
+
+# --- the eval and arena inputs -----------------------------------------------
+
+def test_tool_accuracy_is_the_share_of_dataset_cases_that_passed():
+    assert metrics._tool_accuracy({"passed": 3, "total": 4}) == 0.75
+    assert metrics._tool_accuracy({"passed": 0, "total": 4}) == 0.0
+    # No report at all is not a zero: nobody ran the suite.
+    assert metrics._tool_accuracy({}) is None
+    assert metrics._tool_accuracy({"passed": 0, "total": 0}) is None
+
+
+def _race(scores: dict[str, float]) -> dict:
+    return {"results": [{"spec": spec, "quality": {"score": score}}
+                        for spec, score in scores.items()]}
+
+
+def test_preference_rate_counts_races_the_configured_model_won():
+    runs = [_race({"deepseek:pro": 8.0, "openai:gpt": 6.0}),
+            _race({"deepseek:pro": 4.0, "openai:gpt": 9.0}),
+            _race({"deepseek:pro": 7.0, "openai:gpt": 7.0})]
+    assert metrics._preference_rate(runs, "deepseek:pro") == round(2 / 3, 4)
+
+
+def test_preference_rate_needs_a_field_to_prefer_against():
+    # One model scored is not a preference, and no races is not a zero.
+    assert metrics._preference_rate([_race({"deepseek:pro": 8.0})], "deepseek:pro") is None
+    assert metrics._preference_rate([], "deepseek:pro") is None
+
+
+def _raced_case(case: str, outcomes: list[bool]) -> list[dict]:
+    return [{"results": [{"completion": {"case": case, "passed": p}}]} for p in outcomes]
+
+
+def test_pass_at_k_counts_a_capability_that_is_reachable():
+    """One pass in k is the whole point: the question is whether the capability
+    is reachable at all, not how often it lands. A pass rate would say 10%."""
+    runs = _raced_case("schedule-basic", [False] * 9 + [True]) \
+        + _raced_case("book-alex", [False, False])
+    assert metrics._pass_at_k(runs, k=2) == 0.5
+
+
+def test_pass_at_k_needs_a_case_run_more_than_once():
+    assert metrics._pass_at_k(_raced_case("schedule-basic", [True]), k=2) is None
+    assert metrics._pass_at_k([], k=2) is None

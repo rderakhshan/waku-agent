@@ -53,16 +53,18 @@ SLOTS: tuple[dict[str, Any], ...] = (
     {"id": "success_rate", "label": "Success rate (SR / TSR)", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "higher",
      "source": "eval", "filler": "an eval run: make gate writes eval_report.json"},
-    {"id": "tool_use_accuracy", "label": "Tool-use accuracy", "state": "ready",
+    {"id": "tool_use_accuracy", "label": "Tool-use accuracy", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "higher",
      "source": "eval",
-     "filler": "per-case tool and arg matching, exported from the deterministic suite"},
+     "filler": "a deterministic run: the suite records which dataset cases passed"},
     {"id": "average_reward", "label": "Average reward", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "score", "direction": "higher",
      "source": "judge", "filler": "a batch run: python -m concentric.metrics --run"},
-    {"id": "pass_at_k", "label": "Pass@k", "state": "ready",
+    {"id": "pass_at_k", "label": "Pass@k", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "probability", "direction": "higher",
-     "source": "eval", "filler": "each dataset case run k times"},
+     "source": "eval",
+     "filler": "an arena race that has run the same case twice; one pass in k is "
+               "the point, so a single run cannot answer it"},
     {"id": "hallucination_rate", "label": "Hallucination rate", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "lower",
      "source": "judge",
@@ -184,9 +186,11 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "source": "judge", "filler": "the same elicitation, meaningful once a seat is user-facing"},
 
     # -- preference and human factors -----------------------------------------
-    {"id": "preference_rate", "label": "Preference rate", "state": "ready",
+    {"id": "preference_rate", "label": "Preference rate", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "higher",
-     "source": "judge", "filler": "the arena's pairwise races, scored by a judge"},
+     "source": "judge",
+     "filler": "an arena race with at least two quality-judged models; a "
+               "preference needs a field to prefer against"},
     {"id": "sus", "label": "SUS (dashboard usability)", "state": "ready",
      "kind": "scalar", "changes": "rarely", "unit": "score", "direction": "higher",
      "source": "human", "filler": "the ten-question System Usability Scale, answered by a person"},
@@ -1013,6 +1017,95 @@ def apply_report(reg: dict[str, dict], report: dict) -> int:
     return applied
 
 
+# --- the eval and arena inputs -----------------------------------------------
+#
+# Two metrics need a file rather than a trace, because their numerator is
+# produced by something that runs on purpose: the deterministic suite, and the
+# arena. Both files are read here and turned into numbers by pure functions, so
+# `compute()` still never touches a disk.
+
+# pass@k's k. Two is the smallest repeat that can distinguish "it worked" from
+# "it worked once" — the taxonomy's whole point in asking for k at all.
+PASS_K = 2
+
+
+def tool_report_path(ensure: bool = True):
+    """Where the deterministic suite records which dataset cases passed.
+
+    A separate file from eval_report.json, which is written by release_gate.py
+    inside waku/ and cannot be extended from here.
+
+    `ensure=False` is for the writer, which must not create a home just by
+    running the test suite: a checkout that has never been used should stay
+    untouched, and CI is a checkout that has never been used.
+    """
+    _home_env()
+    from waku.config import load_settings
+
+    settings = load_settings()
+    if ensure:
+        settings.ensure_home()
+    return settings.home / "tool_report.json"
+
+
+def _read_json(path) -> dict:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _tool_accuracy(report: dict) -> float | None:
+    """The share of dataset cases where the expected tool fired with the
+    expected arguments. The suite already asserts this per case; the file is
+    only the outcome written down."""
+    total = report.get("total") or 0
+    return round((report.get("passed") or 0) / total, 4) if total else None
+
+
+def _preference_rate(runs: list[dict], spec: str) -> float | None:
+    """Over races that were quality-judged, how often the department's own model
+    scored highest.
+
+    A preference needs a field to prefer against, so a race where fewer than two
+    models returned a score is not one — and with no arena runs at all there is
+    no preference to measure, which is None rather than zero.
+    """
+    judged = wins = 0
+    for race in runs:
+        scores = [(r.get("spec"), (r.get("quality") or {}).get("score"))
+                  for r in race.get("results", [])]
+        scores = [(s, q) for s, q in scores if q is not None]
+        if len(scores) < 2:
+            continue
+        judged += 1
+        best = max(q for _, q in scores)
+        if spec in {s for s, q in scores if q == best}:
+            wins += 1
+    return round(wins / judged, 4) if judged else None
+
+
+def _pass_at_k(runs: list[dict], k: int = PASS_K) -> float | None:
+    """Over cases run at least k times, the share where at least one run passed.
+
+    This is a different number from a pass rate, and deliberately so: a case that
+    fails nine times and passes once still counts here, because the question is
+    whether the capability is reachable at all.
+    """
+    by_case: dict[str, list[bool]] = {}
+    for race in runs:
+        for r in race.get("results", []):
+            completion = r.get("completion") or {}
+            case = completion.get("case")
+            if case is None:
+                continue
+            by_case.setdefault(str(case), []).append(bool(completion.get("passed")))
+    repeated = [outcomes for outcomes in by_case.values() if len(outcomes) >= k]
+    if not repeated:
+        return None
+    return round(sum(1 for o in repeated if any(o)) / len(repeated), 4)
+
+
 # --- the registry, filled ----------------------------------------------------
 
 def compute(ctx: dict) -> dict[str, dict]:
@@ -1028,6 +1121,10 @@ def compute(ctx: dict) -> dict[str, dict]:
 
     fills: dict[str, Any] = {
         "success_rate": _success_rate(ctx.get("eval_report")),
+        "tool_use_accuracy": _tool_accuracy(ctx.get("tool_report") or {}),
+        "preference_rate": _preference_rate(ctx.get("arena_runs") or [],
+                                            ctx.get("arena_spec") or ""),
+        "pass_at_k": _pass_at_k(ctx.get("arena_runs") or []),
         "latency_avg": stats.get("latency_avg"),
         "latency_p95": stats.get("latency_p95"),
         "throughput": _throughput(events),
@@ -1134,6 +1231,13 @@ def context() -> dict:
     from concentric.collect import _events, collect_department
 
     data = collect_department()
+
+    # The two inputs that come from a file rather than a trace: the suite's
+    # per-case outcomes, and the arena's races.
+    from waku.config import load_settings
+    from waku.ops.compare_history import load_runs
+
+    settings = load_settings()
     return {
         "events": _events(),
         "stats": data.get("stats") or {},
@@ -1145,6 +1249,9 @@ def context() -> dict:
         "chat_pending": data.get("chat_pending") or 0,
         "eval_report": data.get("eval_report"),
         "report": load_report(),
+        "tool_report": _read_json(tool_report_path()),
+        "arena_runs": load_runs(settings.home),
+        "arena_spec": f"{settings.provider}:{settings.model}",
     }
 
 
