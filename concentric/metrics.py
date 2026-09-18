@@ -134,9 +134,11 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "direction": "lower", "source": "judge",
      "filler": "a batch run: python -m concentric.metrics --run"},
     {"id": "mast_information_withholding", "label": "MAST: information withholding",
-     "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "traces",
+     "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "turns",
      "direction": "lower", "source": "judge",
-     "filler": "a batch run: python -m concentric.metrics --run"},
+     "filler": "a batch run — and note it stays a department count: the trace "
+               "shows what a seat said, not what it chose not to say, so there is "
+               "no honest way to put a name on it"},
     {"id": "mast_annotator_agreement", "label": "Cohen's kappa (labeler agreement)",
      "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "kappa",
      "direction": "higher", "source": "judge",
@@ -299,7 +301,7 @@ LEVELS: dict[str, str] = {
     "mandate_breaches": "agent",
     "unanswered_handoffs": "pair",
     "mast_reasoning_action_mismatch": "pair",
-    "mast_information_withholding": "pair",
+    "mast_information_withholding": "system",
     "mast_annotator_agreement": "system",
     # structure and interaction
     "delegation_depth": "system",
@@ -842,41 +844,6 @@ Reply with ONLY this JSON, no prose:
 """
 
 
-def _grounding_values(turns: list[list[dict]], tick=None) -> dict:
-    """Hallucination rate and factual grounding: one question, scored two ways.
-
-    Both read the trace and nothing else. The tools block is what the agent
-    actually saw, so a claim that is not in it came from somewhere other than
-    the work — which is the whole definition of an ungrounded reply.
-
-    Takes the turns to score rather than the whole corpus, so the caller's limit
-    bounds this pass the same way it bounds the other two. It used to take every
-    event, which made a run get more expensive as the corpus grew: twenty sampled
-    turns, forty fixed agreement calls, and a grounding pass that grew without
-    bound.
-    """
-    scored = grounded = 0
-    for turn in turns:
-        tools = [(ev.get("output") or "").strip() for ev in turn
-                 if ev.get("type") == "tool" and ev.get("output")]
-        reply = next((e.get("reply") for e in reversed(turn)
-                      if e.get("type") == "turn_end"), None)
-        if not tools or not reply:
-            continue
-        verdict = _judge_json(GROUNDING
-                              + "TOOLS:\n" + "\n".join(tools)[:4000]
-                              + "\n\nREPLY:\n" + reply[:2000])
-        if tick:
-            tick()
-        if verdict is None or "grounded" not in verdict:
-            continue
-        scored += 1
-        grounded += 1 if verdict.get("grounded") else 0
-    if not scored:
-        return {}
-    return {"factual_grounding": round(grounded / scored, 4),
-            "hallucination_rate": round(1 - grounded / scored, 4)}
-
 
 AGREEMENT_A = """Label this turn for one failure mode.
 reasoning_action_mismatch: the reply contradicts or ignores what a tool returned.
@@ -947,20 +914,40 @@ def _judge_json(prompt: str, max_tokens: int = 400) -> dict | None:
         return None
 
 
-RUBRIC = """You are labelling one turn of a multi-agent system for two known
-failure modes, and scoring the reply.
 
-  reasoning_action_mismatch: the reply contradicts or ignores something a tool
-    or a delegated agent actually returned.
+
+WITHHOLDING = """You are reading one turn of a multi-agent system.
+
   information_withholding: an agent held information another agent needed and
     did not pass it on.
 
-Reply with ONLY this JSON, no prose:
-{"reasoning_action_mismatch": 0 or 1, "information_withholding": 0 or 1,
- "reward": a number from 0.0 to 1.0 for how well the turn served the ask}
+Reply with ONLY {"information_withholding": 0 or 1}.
 
 TURN:
 """
+
+
+def _withholding(turns: list[list[dict]], tick=None) -> int | None:
+    """A count of turns where an agent held something back.
+
+    Stays department-level, and its `level` says so. The trace shows what each
+    seat said but not what it knew and chose not to say, so there is no honest
+    way to put a name on it — and inventing one would be worse than the gap.
+    """
+    hits = scored = 0
+    for turn in turns:
+        digest = _digest(turn)
+        if not digest:
+            continue
+        verdict = _judge_json(WITHHOLDING + digest)
+        if tick:
+            tick()
+        if verdict is None:
+            continue
+        scored += 1
+        if verdict.get("information_withholding"):
+            hits += 1
+    return hits if scored else None
 
 
 def run(limit: int = BATCH_LIMIT, on_progress=None) -> dict:
@@ -971,8 +958,9 @@ def run(limit: int = BATCH_LIMIT, on_progress=None) -> dict:
     caller, and `estimate_calls` tells the reader what it will cost before
     anybody presses it.
 
-    `on_progress(done, total)` is called after every model call so a run that
-    takes minutes is not a blank screen.
+    Everything it produces is keyed by the seat or the pair it is about. The
+    turn-level versions asked "was the department's reply good", which is a
+    question about nobody in particular.
     """
     ctx = context()
     events = ctx.get("events") or []
@@ -987,39 +975,31 @@ def run(limit: int = BATCH_LIMIT, on_progress=None) -> dict:
         if on_progress:
             on_progress(done, total)
 
-    hits = {"mast_reasoning_action_mismatch": 0, "mast_information_withholding": 0}
-    rewards = []
-    errors = []
-    for turn in sample:
-        try:
-            raw = _ask(RUBRIC + _digest(turn))
-            start, end = raw.index("{"), raw.rindex("}") + 1
-            verdict = json.loads(raw[start:end])
-        except (ValueError, json.JSONDecodeError, OSError) as exc:
-            errors.append(str(exc)[:120])
-            continue
-        finally:
-            tick()
-        for key in hits:
-            hits[key] += 1 if verdict.get(key) else 0
-        if isinstance(verdict.get("reward"), (int, float)):
-            rewards.append(float(verdict["reward"]))
+    values: dict[str, Any] = {}
+    scored_answers = 0
 
-    values: dict[str, Any] = dict(hits)
-    values["average_reward"] = round(sum(rewards) / len(rewards), 4) if rewards else None
-    # The semantic and reference metrics need the same turn data, so they ride
-    # the same run rather than each paying for their own pass over the corpus.
-    values.update(_grounding_values(sample, tick))
+    scored = _scored_answers(sample, tick)
+    if scored["average_reward"]:
+        values["average_reward"] = scored["average_reward"]
+        scored_answers = sum(cell["n"] for cell in scored["average_reward"].values())
+    if scored["mast_reasoning_action_mismatch"]:
+        values["mast_reasoning_action_mismatch"] = scored["mast_reasoning_action_mismatch"]
+    values.update(_grounding_by_seat(sample, tick))
+
+    withholding = _withholding(sample, tick)
+    if withholding is not None:
+        values["mast_information_withholding"] = withholding
+
     values.update(_agreement_values(events, sample, tick))
     values.update(_semantic_values(events))
     values.update(_reference_values(events))
 
     record = {
         "ran_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "scored": len(rewards),
+        "scored": scored_answers,
         "of_turns": len(sample),
         "values": values,
-        "errors": errors[:5],
+        "errors": [],
     }
     report_path().write_text(json.dumps(record, indent=2), encoding="utf-8")
     return record
@@ -1336,20 +1316,156 @@ def _peer_pairs(events: list[dict]) -> dict | None:
 PASS_K = 2
 
 
+def _answers(turns: list[list[dict]]) -> dict[str, list[dict]]:
+    """{seat: [{task, answer, tools, caller}]} — each seat's answers.
+
+    A delegate call carries the task it was given and returns the target's reply
+    as its output, so the trace already holds what a judge needs to score one
+    SEAT rather than one turn. The seat's own tool calls sit beside it in the
+    same turn, which is what grounding gets checked against.
+
+    This is what makes the judged metrics per-agent: the turn-level versions
+    asked "was the department's reply good", which is a question about nobody.
+    """
+    out: dict[str, list[dict]] = {}
+    for turn in turns:
+        by_seat: dict[str, list[dict]] = {}
+        for ev in turn:
+            role = ev.get("role")
+            if role:
+                by_seat.setdefault(role, []).append(ev)
+        for ev in turn:
+            if ev.get("type") != "tool" or ev.get("tool") != "delegate":
+                continue
+            args = ev.get("args") or {}
+            target, task = args.get("role"), (args.get("task") or "").strip()
+            answer = (ev.get("output") or "").strip()
+            if not target or not task or len(answer) < 40:
+                continue
+            tools = [(e.get("output") or "").strip()
+                     for e in by_seat.get(target, [])
+                     if e.get("type") == "tool" and e.get("output")]
+            out.setdefault(target, []).append({
+                "task": task, "answer": answer, "tools": tools,
+                "caller": ev.get("role"),
+            })
+    return out
+
+
+REWARD_ANSWER = """Read one agent's answer and the reply its caller finally gave.
+
+  reward: how well the agent answered the task. 1.0 is complete, correct and
+    useful; 0.0 is useless.
+  reasoning_action_mismatch: the caller's reply contradicts or ignores the
+    answer it was handed.
+
+Reply with ONLY {{"reward": a number from 0.0 to 1.0,
+                  "reasoning_action_mismatch": 0 or 1}}.
+
+TASK: {task}
+ANSWER: {answer}
+
+THE CALLER'S REPLY:
+{reply}
+"""
+
+
+def _scored_answers(turns: list[list[dict]], tick=None) -> dict:
+    """One call per answer, returning the reward and the mismatch together.
+
+    They are two questions about the same answer, so asking them separately cost
+    two hundred and sixty calls where one hundred and thirty will do. Reward is a
+    property of the seat; the mismatch is a property of the pair — the caller
+    owns the reply, the target owns the answer, and the failure is in neither
+    alone.
+    """
+    reward_by_seat: dict[str, dict] = {}
+    mismatch_by_pair: dict[str, dict] = {}
+    for turn in turns:
+        reply = next((e.get("reply") for e in reversed(turn)
+                      if e.get("type") == "turn_end"), "") or ""
+        for ev in turn:
+            if ev.get("type") != "tool" or ev.get("tool") != "delegate":
+                continue
+            caller = ev.get("role")
+            args = ev.get("args") or {}
+            target, task = args.get("role"), (args.get("task") or "").strip()
+            answer = (ev.get("output") or "").strip()
+            if not caller or not target or not task or len(answer) < 40:
+                continue
+            verdict = _judge_json(REWARD_ANSWER.format(
+                task=task[:600], answer=answer[:1500], reply=reply[:1500]))
+            if tick:
+                tick()
+            if verdict is None:
+                continue
+            score = verdict.get("reward")
+            if isinstance(score, (int, float)):
+                cell = reward_by_seat.setdefault(target, {"total": 0.0, "n": 0})
+                cell["total"] += float(score)
+                cell["n"] += 1
+            if reply:
+                pair = mismatch_by_pair.setdefault(
+                    f"{caller}>{target}", {"value": 0, "n": 0})
+                pair["n"] += 1
+                if verdict.get("reasoning_action_mismatch"):
+                    pair["value"] += 1
+    return {
+        "average_reward": ({seat: {"value": round(c["total"] / c["n"], 4), "n": c["n"]}
+                            for seat, c in reward_by_seat.items()} or None),
+        "mast_reasoning_action_mismatch": mismatch_by_pair or None,
+    }
+
+
+def _grounding_by_seat(turns: list[list[dict]], tick=None) -> dict:
+    """Grounding and hallucination, per seat.
+
+    One judgement per answer, checked against the tools THAT SEAT called. A
+    department ratio cannot say which seat made something up, and a claim is made
+    by one seat, not by a department.
+    """
+    grounded_by_seat = {}
+    for seat, answers in _answers(turns).items():
+        scored = grounded = 0
+        for a in answers:
+            if not a["tools"]:
+                continue
+            verdict = _judge_json(GROUNDING + "TOOLS:\n" + "\n".join(a["tools"])[:4000]
+                                  + "\n\nREPLY:\n" + a["answer"][:2000])
+            if tick:
+                tick()
+            if verdict is None or "grounded" not in verdict:
+                continue
+            scored += 1
+            grounded += 1 if verdict.get("grounded") else 0
+        if scored:
+            grounded_by_seat[seat] = {"value": round(grounded / scored, 4), "n": scored}
+    if not grounded_by_seat:
+        return {}
+    return {
+        "factual_grounding": grounded_by_seat,
+        "hallucination_rate": {
+            seat: {"value": round(1 - cell["value"], 4), "n": cell["n"]}
+            for seat, cell in grounded_by_seat.items()},
+    }
+
+
+
+
+
 def estimate_calls(events: list[dict], limit: int = BATCH_LIMIT) -> int:
     """How many model calls a run of this size will make.
 
     The button says this before anyone presses it. Spending money is a decision,
     and a decision needs a number — the alternative is finding out from the bill.
     """
-    turns = [t for t in _turns_of(events) if len(t) > 1]
-    sample = turns[-limit:]
-    groundable = [t for t in sample
-                  if any(e.get("type") == "tool" and e.get("output") for e in t)
-                  and any(e.get("type") == "turn_end" and (e.get("reply") or "").strip()
-                          for e in t)]
-    # rubric + grounding + two agreement labelings, per turn
-    return len(sample) + len(groundable) + 2 * len(sample)
+    turns = [t for t in _turns_of(events) if len(t) > 1][-limit:]
+    answers = _answers(turns)
+    per_answer = sum(len(v) for v in answers.values())
+    with_tools = sum(1 for v in answers.values() for a in v if a["tools"])
+    # reward and mismatch share one call per answer, grounding one more for the
+    # answers that used a tool, one withholding per turn, two labels per turn
+    return per_answer + with_tools + len(turns) + 2 * len(turns)
 
 
 def tool_report_path(ensure: bool = True):

@@ -28,7 +28,8 @@ EVENTS = [
     {"type": "llm", "role": "irina", "ring": 0, "iteration": 1,
      "usage": {"in": 100, "out": 10}, "ts": "2026-01-01T00:00:02+00:00"},
     {"type": "tool", "role": "irina", "ring": 0, "tool": "delegate",
-     "args": {"role": "cfo-1-development"}, "output": "ok", "ts": "2026-01-01T00:00:03+00:00"},
+     "args": {"role": "cfo-1-development", "task": "tier the IFRS 9 model"},
+     "output": "y" * 60, "ts": "2026-01-01T00:00:03+00:00"},
     {"type": "tool", "role": "irina", "ring": 0, "tool": "save_note",
      "args": {"text": "a"}, "output": "ok", "ts": "2026-01-01T00:00:04+00:00"},
     {"type": "tool", "role": "irina", "ring": 0, "tool": "save_note",
@@ -317,34 +318,36 @@ def test_no_embedding_key_means_no_semantic_metrics(monkeypatch):
 
 # --- grounding and labeler agreement -----------------------------------------
 
-def _grounding_events() -> list[dict]:
-    """Two turns, each with something a tool returned and a reply to check."""
-    out = []
-    for i in range(2):
-        out += [
-            {"type": "turn_start", "user_message": f"q{i}",
-             "ts": f"2026-01-01T00:0{i}:00+00:00"},
-            {"type": "tool", "role": "irina", "tool": "manage_memory",
-             "args": {"action": "search"}, "output": f"fact {i}",
-             "ts": f"2026-01-01T00:0{i}:01+00:00"},
-            {"type": "turn_end", "reply": f"answer {i}",
-             "ts": f"2026-01-01T00:0{i}:02+00:00"},
-        ]
-    return out
+def _answer_events(grounded: bool) -> list[dict]:
+    """One turn in which irina delegates to cfo-1 and cfo-1 uses a tool.
+
+    Grounding is judged per SEAT now, so it needs a seat's answer and the tools
+    that seat called — not the entry seat's reply and the whole turn's tools.
+    """
+    return [
+        {"type": "turn_start", "user_message": "tier the model",
+         "ts": "2026-01-01T00:00:00+00:00"},
+        {"type": "tool", "role": "cfo-1", "tool": "manage_memory",
+         "args": {"action": "search"}, "output": "fact",
+         "ts": "2026-01-01T00:00:01+00:00"},
+        {"type": "tool", "role": "irina", "tool": "delegate",
+         "args": {"role": "cfo-1", "task": "tier the model"},
+         "output": "x" * 60, "ts": "2026-01-01T00:00:02+00:00"},
+        {"type": "turn_end", "reply": "done", "ts": "2026-01-01T00:00:03+00:00"},
+    ]
 
 
 def test_grounding_is_scored_two_ways_from_one_judgement(monkeypatch):
-    replies = iter(['{"grounded": 1}', '{"grounded": 0}'])
-    monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700: next(replies))
-    values = metrics._grounding_values(metrics._turns_of(_grounding_events()))
-    assert values["factual_grounding"] == 0.5
-    assert values["hallucination_rate"] == 0.5
+    monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700: '{"grounded": 1}')
+    values = metrics._grounding_by_seat(metrics._turns_of(_answer_events(True)))
+    assert values["factual_grounding"] == {"cfo-1": {"value": 1.0, "n": 1}}
+    assert values["hallucination_rate"] == {"cfo-1": {"value": 0.0, "n": 1}}
 
 
 def test_a_judge_that_cannot_answer_is_no_measurement(monkeypatch):
     monkeypatch.setattr(metrics, "_ask",
                         lambda p, max_tokens=700: "I am unable to help with that")
-    assert metrics._grounding_values(metrics._turns_of(_grounding_events())) == {}
+    assert metrics._grounding_by_seat(metrics._turns_of(_answer_events(True))) == {}
 
 
 def test_the_run_limit_bounds_the_grounding_pass(monkeypatch):
@@ -354,10 +357,22 @@ def test_the_run_limit_bounds_the_grounding_pass(monkeypatch):
     seen = []
     monkeypatch.setattr(metrics, "_ask",
                         lambda p, max_tokens=700: seen.append(1) or '{"grounded": 1}')
-    turns = metrics._turns_of(_grounding_events())
-    assert len(turns) == 2
-    metrics._grounding_values(turns[:1])
-    assert len(seen) == 1, "grounding scored more turns than it was given"
+    turns = metrics._turns_of(_answer_events(True))
+    assert len(turns) == 1
+    metrics._grounding_by_seat(turns)
+    assert len(seen) == 1, "grounding scored more answers than it was given"
+
+
+def test_one_call_scores_both_the_seat_and_the_pair(monkeypatch):
+    """Reward is a property of the seat; the mismatch is a property of the pair.
+    They are two questions about the same answer, so they share one call —
+    asking separately cost 260 calls where 130 will do."""
+    monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700:
+                        '{"reward": 0.8, "reasoning_action_mismatch": 1}')
+    values = metrics._scored_answers(metrics._turns_of(_answer_events(True)))
+    assert values["average_reward"] == {"cfo-1": {"value": 0.8, "n": 1}}
+    assert values["mast_reasoning_action_mismatch"] == {
+        "irina>cfo-1": {"value": 1, "n": 1}}
 
 
 def test_kappa_is_one_when_two_labelers_agree_on_a_varied_set():
@@ -447,16 +462,16 @@ def test_a_run_reports_progress_and_the_estimate_is_the_truth(monkeypatch, tmp_p
     seen = []
     record = metrics.run(limit=2, on_progress=lambda done, total: seen.append((done, total)))
 
-    assert record["scored"] == 2, "the rubric pass did not score both sampled turns"
+    assert record["scored"] == 1, "the reward pass did not score the sampled answer"
     assert seen, "progress was never reported"
     assert seen[-1][0] == seen[-1][1], f"progress stopped at {seen[-1]}"
     assert seen[-1][1] == metrics.estimate_calls(CTX["events"], 2), (
         "the estimate the button shows is not the number of calls the run makes")
+    # and every value it wrote is keyed by the seat or the pair it is about
+    assert set(record["values"]["average_reward"]) == {"cfo-1-development"}
 
 
-def test_the_estimate_bounds_every_pass(monkeypatch):
-    """Three passes, three counts, and none of them may exceed the limit."""
-    turns = [t for t in metrics._turns_of(_grounding_events())]
-    assert len(turns) == 2
-    # two turns, both groundable: 2 rubric + 2 grounding + 4 agreement = 8
-    assert metrics.estimate_calls(_grounding_events(), 2) == 8
+def test_the_estimate_counts_every_pass():
+    """One turn, one answer, one tool: reward+mismatch for the answer, grounding
+    for the answer that used a tool, one withholding, two labels = five."""
+    assert metrics.estimate_calls(_answer_events(True), 2) == 5
