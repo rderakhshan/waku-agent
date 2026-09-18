@@ -340,6 +340,74 @@ LEVELS: dict[str, str] = {
 }
 
 
+# How a metric behaves when it is summed over a time bucket.
+#
+#   sum    a count or a total. A week of repeats is the repeats in that week.
+#   mean   a ratio, a time or a score. A week of latencies is the mean latency of
+#          the turns in it, weighted by how many there were.
+#
+# Getting this wrong is the quietest way a trend chart lies. Summing latencies
+# gives a number with no unit; averaging a week of counts gives one with no
+# meaning. There is no universal rule — it depends on the metric — so it is
+# declared here, once, and an eval checks that every slot is covered.
+AGG: dict[str, str] = {
+    # counts and totals
+    "tokens_in": "sum",
+    "tokens_out": "sum",
+    "cost": "sum",
+    "cost_per_ring": "sum",
+    "tool_errors": "sum",
+    "step_repetition": "sum",
+    "premature_terminations": "sum",
+    "mandate_breaches": "sum",
+    "unanswered_handoffs": "sum",
+    "consultations": "sum",
+    "peer_pairs_used": "sum",
+    "mast_reasoning_action_mismatch": "sum",
+    "mast_information_withholding": "sum",
+    "memory_growth": "sum",
+    "fact_writers": "sum",
+    "seats_without_memory": "sum",
+    "idle_seats": "sum",
+    "consolidation_backlog": "sum",
+    # ratios, times and scores
+    "success_rate": "mean",
+    "tool_use_accuracy": "mean",
+    "average_reward": "mean",
+    "pass_at_k": "mean",
+    "hallucination_rate": "mean",
+    "factual_grounding": "mean",
+    "context_retention": "mean",
+    "latency_avg": "mean",
+    "latency_p95": "mean",
+    "throughput": "mean",
+    "gate_retrieval_ratio": "mean",
+    "context_growth": "mean",
+    "handoff_latency": "mean",
+    "delegation_depth": "mean",
+    "delegation_breadth": "mean",
+    "mast_annotator_agreement": "mean",
+    "argument_confidence": "mean",
+    "cognitive_effort": "mean",
+    "cognitive_dissonance": "mean",
+    "empathy": "mean",
+    "preference_rate": "mean",
+    "sus": "mean",
+    "stance_convergence": "mean",
+    "stance_shift": "mean",
+    "semantic_diversity": "mean",
+    "bertscore": "mean",
+    "bleu_rouge_meteor": "mean",
+    "bench_code": "mean",
+    "bench_agentic": "mean",
+    "bench_general": "mean",
+    "bench_math": "mean",
+    "bench_domain": "mean",
+    "bench_multimodal": "mean",
+    "bench_task_selection": "mean",
+}
+
+
 def registry() -> dict[str, dict]:
     """A fresh copy of the slots, keyed by id."""
     return {slot["id"]: {**slot, "level": LEVELS.get(slot["id"], "system"),
