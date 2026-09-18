@@ -148,6 +148,7 @@ read and change. Versus the big open-source assistants (OpenClaw, Hermes)? Same 
 | [Integrations](docs/integrations.md) | voice, Telegram, calendars, MCP servers, Waku Memory |
 | [Commands](docs/commands.md) | every `waku` and `make` command |
 | [Evals & tracing](docs/evals.md) | the two kinds of eval, the release gate, traces and spend |
+| [Further evaluation metrics](docs/llm-agent-evaluation-taxonomy.md) | how the field measures LLM agents: the dimensions, the formulas behind each metric family, the benchmarks |
 | [Roadmap](docs/roadmap.md) | what is live, what is still a skeleton, upgrade paths |
 | [Whiteboards](docs/README.md#whiteboards) | the editable system-design charts |
 | [lab/](lab/README.md) | Waku meets other agents and models: the experiments |
