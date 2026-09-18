@@ -258,6 +258,18 @@ def _inject(html: str) -> str:
     return html
 
 
+# A browser that reloads, navigates, or closes a tab mid-response leaves the
+# socket dead, and writing to it raises. waku already treats that as benign in
+# four places — `chat_stream` catches it with the note "the browser navigated
+# away mid-stream — fine" — but its `_send` does not, so every abandoned poll
+# prints a traceback to the console the reader is watching.
+#
+# The dashboard polls /api/data every five seconds and /api/events every 450ms,
+# so an abandoned connection is routine rather than exceptional. Swallowing it
+# here covers this launcher's route and waku's, without editing waku.
+ABORTED = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
+
+
 def _handler_class():
     """waku's request handler, plus three routes for the department view.
 
@@ -310,10 +322,16 @@ def _handler_class():
             if path == "/api/data":
                 from concentric.collect import collect_department
 
-                self._send(json.dumps(collect_department()).encode("utf-8"),
-                           "application/json")
+                try:
+                    self._send(json.dumps(collect_department()).encode("utf-8"),
+                               "application/json")
+                except ABORTED:
+                    pass
                 return
-            super().do_GET()
+            try:
+                super().do_GET()
+            except ABORTED:
+                pass
 
     return DepartmentHandler
 
