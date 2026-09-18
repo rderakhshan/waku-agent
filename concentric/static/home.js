@@ -44,8 +44,8 @@
         <div class="home-cta">
           ${uiButton("Open the department", {
             level: "primary", onclick: "location.hash='#overview/multi'"})}
-          ${uiButton("See the single agent", {
-            level: "secondary", onclick: "location.hash='#overview'"})}
+          ${uiButton("The cockpit", {
+            level: "secondary", onclick: "location.hash='#ops'"})}
         </div>
       </div>
     </section>`;

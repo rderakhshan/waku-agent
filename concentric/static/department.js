@@ -121,7 +121,7 @@
   /* The mechanism beats while a step is working, the way the department's own
      cards do.
      waku HOLDS .hot rather than pulsing it — its comment says four boxes in one
-     wave lighting together is the point — and on the Single Agent page that is
+     wave lighting together is the point — and on its own overview page that is
      right. Inside an open card the reader is watching one seat, so a beat says
      "working" more clearly than an outline that merely sits there.
      Softer than the card's beat: these boxes are 200px wide, not 250, and 1.18
@@ -297,8 +297,8 @@
     }).join("");
   }
 
-  // The open seat carries waku's own architecture chart — the same archSVG the
-  // Single Agent tab draws, nested inside the card.
+  // The open seat carries waku's own architecture chart — the same archSVG its
+  // overview page draws, nested inside the card.
   //
   // archSVG returns a <div> wrapping an <svg>. A nested <svg> is legal in SVG2,
   // so the element is lifted out of the div, given x/y/width/height, and placed.
@@ -442,8 +442,8 @@
 
   // ---- clicking a seat opens its architecture.
   //
-  // The chart is waku's own archSVG — the same function the Single Agent tab
-  // draws — so this is that chart, not a copy of it.
+  // The chart is waku's own archSVG — the same function its overview page draws
+  // — so this is that chart, not a copy of it.
   //
   // The picture is identical for every seat, because every seat is a Waku. What
   // is NOT identical is the header above it — this seat's own tools, memory and
@@ -463,8 +463,8 @@
   // beating at once, and each would claim the work was its own.
   //
   // So hot() is wrapped once, here, at load. Anything inside a [data-card] lights
-  // only for that card's seat; anything outside one — the Single Agent chart, the
-  // graph's own nodes, the Overview page — lights for everything, exactly as
+  // only for that card's seat; anything outside one — a chart on waku's own
+  // overview page, the graph's own nodes — lights for everything, exactly as
   // before. hotSeat carries the seat from animateStage down to the wrapper.
   //
   // Wrapping hot() rather than filtering events is what lets the number of open
@@ -889,35 +889,44 @@
         ${dep.edges.length} delegation edges. Grey = never used.</div>`)
       + seatsTable(dep);
   };
-  // ---- Overview and Department are one page with two tabs.
+  // ---- the Work Desk is the department, and only the department.
   //
-  // The nav keeps a single entry, and these live inside it. main.js calls
-  // VIEWS.overview(D) without the sub-path — the overview branch of its router
-  // predates sub-tabs — so the active tab is read from location.hash, which is
-  // where the router keeps it anyway, and hashchange is already wired to render.
+  // It used to be two tabs: waku's own overview ("Single Agent") and this one
+  // ("Multi Agentic"). The single-agent page was redundant here — the department
+  // is what this dashboard is for, and waku's overview is still a keystroke away
+  // on :7777, where it is the whole point rather than one tab of two.
   //
-  // Nothing below reimplements either view: Single Agent is waku's own overview
-  // function and Multi Agentic is the department function above, called as they
-  // always were.
-  const overviewBase = VIEWS.overview;
+  // waku's overview is a pure render function: it takes the payload and returns
+  // a string, starting nothing and polling nothing. Every pipeline it appears to
+  // own is driven elsewhere — the payload by main.js's refresh(), the events by
+  // its pollEvents(), the chat by the dock. So not rendering it removes a view,
+  // not a capability, and nothing downstream notices.
+  //
+  // overviewBase is kept, not deleted: it is the only handle on waku's function,
+  // and leaving it here is what makes that explicit rather than a thing someone
+  // has to reconstruct later.
+  //
+  // main.js calls VIEWS.overview(D) without the sub-path — the overview branch of
+  // its router predates sub-tabs — so the mode is read from location.hash, which
+  // is where the router keeps it anyway.
+  const overviewBase = VIEWS.overview;   // deliberately not rendered; see above
   const departmentBase = VIEWS.department;
 
-  function viewTabs(multi) {
-    return uiTabs([
-      { label: "Single Agent", href: "#overview", on: !multi },
-      { label: "Multi Agentic", href: "#overview/multi", on: multi },
-    ]);
+  // One tab, always on: it names the mode the page is in, which is the only thing
+  // a tab bar can still say now that there is nothing to switch to. Both
+  // #overview and #overview/multi land here, so links made before this change
+  // still work.
+  function viewTabs() {
+    return uiTabs([{ label: "Multi Agentic", href: "#overview/multi", on: true }]);
   }
 
   VIEWS.overview = (d, sub) => {
-    const multi = (location.hash || "").slice(1).split("/")[1] === "multi";
     // The head is written by the router before the view runs, so the page's own
-    // name is put back after it — the rail entry and the head say the same thing,
-    // and the tab bar is what says which mode you are in.
+    // name is put back after it — the rail entry and the head say the same thing.
     setTimeout(() => {
       const title = document.getElementById("title");
       if (title) title.textContent = "Work Desk";
     }, 0);
-    return viewTabs(multi) + (multi ? departmentBase(d, sub) : overviewBase(d, sub));
+    return viewTabs() + departmentBase(d, sub);
   };
 })();
