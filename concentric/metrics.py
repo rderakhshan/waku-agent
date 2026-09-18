@@ -811,14 +811,25 @@ def load_report() -> dict:
 
 def _ask(prompt: str, max_tokens: int = 700) -> str:
     """One judge call, through the same client the agent uses. No new
-    dependency: waku's provider adapter is already the only door to a model."""
+    dependency: waku's provider adapter is already the only door to a model.
+
+    The model is read BEFORE get_client, which is not the obvious order and is
+    deliberate. get_client drops a model id it believes belongs to another
+    provider, and its owner map is a dict comprehension over PROVIDERS — so when
+    three providers ship a "deepseek" family, the last one wins the name and
+    "deepseek" itself is judged to be someone else's. The effect was that
+    WAKU_SMALL_MODEL=deepseek-v4-flash was silently replaced by deepseek-v4-pro,
+    and the judge ran on the expensive model while the cheap one sat configured
+    and unused. Reading it first keeps the choice the reader made.
+    """
     from waku.config import load_settings
     from waku.loop.models import get_client
 
     settings = load_settings()
+    model = settings.small_model or settings.model
     client = get_client(settings)
     response = client.messages.create(
-        model=settings.small_model, max_tokens=max_tokens,
+        model=model, max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
     return "".join(b.text for b in response.content if b.type == "text")
