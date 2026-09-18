@@ -121,7 +121,7 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "kind": "series", "changes": "per-turn", "unit": "repeats", "direction": "lower",
      "source": "trace", "filler": "a tool call in the trace"},
     {"id": "unanswered_handoffs", "label": "Unanswered hand-offs", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "handoffs", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "handoffs", "direction": "lower",
      "source": "trace", "filler": "a delegate call in the trace"},
     {"id": "premature_terminations", "label": "Premature terminations", "state": "computed",
      "kind": "series", "changes": "per-turn", "unit": "turns", "direction": "lower",
@@ -150,10 +150,10 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "kind": "scalar", "changes": "rarely", "unit": "seats", "direction": "neutral",
      "source": "trace", "filler": "a delegate or consult call"},
     {"id": "handoff_latency", "label": "Hand-off latency", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "ms", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "ms", "direction": "lower",
      "source": "trace", "filler": "a delegate call the target answered inside its turn"},
     {"id": "consultations", "label": "Peer consultations", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "calls", "direction": "neutral",
+     "kind": "series", "changes": "per-turn", "unit": "calls", "direction": "neutral",
      "source": "trace", "filler": "a consult_peer call"},
     {"id": "peer_pairs_used", "label": "Peer pairs actually used", "state": "computed",
      "kind": "series", "changes": "rarely", "unit": "pairs", "direction": "neutral",
@@ -431,19 +431,6 @@ def _success_rate(eval_report: dict | None) -> float | None:
     return round(passed / total, 4) if total else None
 
 
-def _throughput(events: list[dict]) -> float | None:
-    """Turns per minute of ACTIVE time — the sum of the turns' own durations.
-
-    Wall-clock span is useless here and the first catalogue run proved it: this
-    corpus spans days of idle gaps, so turns-per-day read as 0.002 and said
-    nothing. What a reader wants is how fast the thing works when it is working.
-    """
-    spans = _turn_spans(events)
-    active = sum((end - start).total_seconds() for start, end in spans)
-    if not spans or active <= 0:
-        return None
-    return round(len(spans) / (active / 60), 3)
-
 
 def _gate_retrieval_ratio(stats: dict) -> float | None:
     skip, ret = stats.get("gate_skips") or 0, stats.get("gate_retrieves") or 0
@@ -451,108 +438,16 @@ def _gate_retrieval_ratio(stats: dict) -> float | None:
     return round(ret / total, 4) if total else None
 
 
-def _step_repetition(events: list[dict]) -> int | None:
-    """The same tool called with the same args twice inside one turn — MAST's
-    step repetition, and a pure pattern match over the trace.
-
-    None when nothing ran, not 0. A count of zero over an empty corpus reads as
-    a clean bill of health, and the truth is that nobody looked.
-    """
-    if not any(e.get("type") == "tool" for e in events):
-        return None
-    repeats = 0
-    for turn in _turns_of(events):
-        seen = set()
-        for ev in turn:
-            if ev.get("type") != "tool":
-                continue
-            key = (ev.get("role"), ev.get("tool"),
-                   json.dumps(ev.get("args") or {}, sort_keys=True, default=str))
-            if key in seen:
-                repeats += 1
-            seen.add(key)
-    return repeats
 
 
-def _unanswered_handoffs(events: list[dict]) -> int | None:
-    """A delegate whose target never emitted anything afterwards. The most
-    expensive silent failure in a delegation graph: the work simply stopped."""
-    delegations = _delegations(events)
-    if not delegations:
-        return None
-    stamps = _by_role(events)
-    count = 0
-    for _, target, when in delegations:
-        if not any(t > when for t in stamps.get(target, ())):
-            count += 1
-    return count
 
 
-def _premature_terminations(events: list[dict]) -> int | None:
-    """A turn that never ended, or ended with nothing to say."""
-    turns = _turns_of(events)
-    if not turns:
-        return None
-    count = 0
-    for turn in turns:
-        ends = [e for e in turn if e.get("type") == "turn_end"]
-        if not ends or not (ends[-1].get("reply") or "").strip():
-            count += 1
-    return count
-
-
-def _mandate_breaches(events: list[dict], department: dict) -> int | None:
-    """A seat calling a tool it does not hold. The registry is the roster's own
-    tool list, so this reads the rule rather than restating it."""
-    calls = [e for e in events if e.get("type") == "tool"]
-    if not calls:
-        return None
-    allowed = {s["role"]: set(s.get("tools") or [])
-               for s in department.get("seats", [])}
-    count = 0
-    for ev in calls:
-        role, tool = ev.get("role"), ev.get("tool")
-        if role in allowed and tool and tool not in allowed[role]:
-            count += 1
-    return count
-
-
-def _consultations(events: list[dict]) -> int | None:
-    if not any(e.get("type") == "tool" for e in events):
-        return None
-    return sum(1 for e in events
-               if e.get("type") == "tool" and e.get("tool") == "consult_peer")
-
-
-def _handoff_latency(events: list[dict]) -> int | None:
-    """Milliseconds from a delegate call to the target's first event IN THE SAME
-    TURN.
-
-    Scoping to the turn is the whole metric, and the first catalogue run showed
-    why: across turns the gap is the idle time between sessions, which reported
-    as 860 seconds and was not a hand-off at all.
-    """
-    gaps = []
-    for turn in _turns_of(events):
-        stamps = _by_role(turn)
-        for _, target, when in _delegations(turn):
-            nxt = next((t for t in stamps.get(target, ()) if t > when), None)
-            if nxt:
-                gaps.append((nxt - when).total_seconds() * 1000)
-    return round(statistics.median(gaps)) if gaps else None
 
 
 def _delegation_depth(events: list[dict]) -> int | None:
     rings = [e.get("ring") for e in events if isinstance(e.get("ring"), int)]
     return max(rings) if rings else None
 
-
-def _peer_pairs(events: list[dict]) -> list[str] | None:
-    """Who consults whom. Unattributed events are skipped rather than drawn as a
-    "?" node — a graph edge with an unknown end is not an edge."""
-    pairs = sorted({f"{src}>{dst}" for src, dst, _ in _delegations(events)
-                    if src and src != dst})
-    return pairs or None
 
 
 def _cost_per_ring(usage: dict, department: dict) -> dict[str, float] | None:
@@ -1370,6 +1265,65 @@ def _is_llm(ev: dict) -> bool:
     return ev.get("type") == "llm"
 
 
+def _handoff_for(events: list[dict], src: str, dst: str) -> dict | None:
+    """Milliseconds from a caller's delegate to that target's first answer,
+    inside the turn it happened in — the same rule as the department median, and
+    scoped to the turn for the same reason: across turns the gap is the idle time
+    between sessions, which is not a hand-off at all."""
+    gaps = []
+    for turn in _turns_of(events):
+        stamps = _by_role(turn)
+        for caller, target, when in _delegations(turn):
+            if caller != src or target != dst:
+                continue
+            nxt = next((t for t in stamps.get(dst, ()) if t > when), None)
+            if nxt:
+                gaps.append((nxt - when).total_seconds() * 1000)
+    if not gaps:
+        return None
+    return {"value": round(statistics.median(gaps)), "n": len(gaps)}
+
+
+def _consultations_for(events: list[dict], src: str, dst: str) -> dict | None:
+    """How often one seat asked another at its own round table."""
+    count = sum(1 for ev in events
+                if ev.get("type") == "tool" and ev.get("tool") == "consult_peer"
+                and ev.get("role") == src
+                and (ev.get("args") or {}).get("role") == dst)
+    return {"value": count, "n": count} if count else None
+
+
+def _unanswered_for(events: list[dict], src: str, dst: str) -> dict | None:
+    """Delegates this pair made where the target never emitted anything after.
+    The most expensive silent failure in the graph, and it belongs to the pair —
+    not to the caller, who did hand the work over, and not to the target, which
+    may never have received it."""
+    stamps = _by_role(events)
+    total = unanswered = 0
+    for caller, target, when in _delegations(events):
+        if caller != src or target != dst:
+            continue
+        total += 1
+        if not any(t > when for t in stamps.get(dst, ())):
+            unanswered += 1
+    if not total:
+        return None
+    return {"value": unanswered, "n": total}
+
+
+def _peer_pairs(events: list[dict]) -> dict | None:
+    """Who consults and delegates to whom, and how often — a weighted mesh
+    instead of a flat list of names."""
+    counts: dict[str, int] = {}
+    for src, dst, _ in _delegations(events):
+        if src and dst and src != dst:
+            key = f"{src}>{dst}"
+            counts[key] = counts.get(key, 0) + 1
+    if not counts:
+        return None
+    return {key: {"value": n, "n": n} for key, n in sorted(counts.items())}
+
+
 # --- the eval and arena inputs -----------------------------------------------
 #
 # Two metrics need a file rather than a trace, because their numerator is
@@ -1525,13 +1479,13 @@ def compute(ctx: dict) -> dict[str, dict]:
         "cost_per_ring": _cost_per_ring(usage, department),
         "context_growth": _context_growth(events),
         "step_repetition": _repeats_by_seat(events),
-        "unanswered_handoffs": _unanswered_handoffs(events),
+        "unanswered_handoffs": _by_pair(events, _unanswered_for),
         "premature_terminations": _early_stops_by_seat(events),
         "mandate_breaches": _breaches_by_seat(events, department),
         "delegation_depth": _delegation_depth(events),
         "delegation_breadth": len({r for _, r, _ in _delegations(events)}) or None,
-        "handoff_latency": _handoff_latency(events),
-        "consultations": _consultations(events),
+        "handoff_latency": _by_pair(events, _handoff_for),
+        "consultations": _by_pair(events, _consultations_for),
         "peer_pairs_used": _peer_pairs(events),
         "memory_growth": _memory_growth(db),
         "fact_writers": _fact_writers(ctx.get("facts") or []),

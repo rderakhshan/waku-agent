@@ -147,9 +147,32 @@ def test_the_trace_metrics_read_the_trace():
     """
     reg = metrics.compute(CTX)
     assert reg["step_repetition"]["value"]["irina"]["value"] == 1  # save_note twice
-    assert reg["unanswered_handoffs"]["value"] == 1                # cfo-1 never answered
+    assert reg["unanswered_handoffs"]["value"] == {                # cfo-1 never answered
+        "irina>cfo-1-development": {"value": 1, "n": 1}}
     assert reg["mandate_breaches"]["value"]["irina"]["value"] == 0  # no foreign tool
     assert reg["tool_errors"]["value"]["irina"]["value"] == 0
+
+
+def test_a_pair_metric_names_the_pair():
+    """A hand-off belongs to the pair, not to the caller or the target. The
+    department median over 57 pairs hides the one that is slow; the pair key
+    does not."""
+    reg = metrics.compute(CTX)
+    assert reg["handoff_latency"]["level"] == "pair"
+    # In CTX the delegate at 00:00:03 was never answered, so there is no gap to
+    # measure — and no hand-off latency is the honest answer, not a zero.
+    assert reg["handoff_latency"]["value"] is None
+
+    answered = [
+        {"type": "turn_start", "user_message": "q", "ts": "2026-01-01T00:00:00+00:00"},
+        {"type": "tool", "role": "irina", "tool": "delegate",
+         "args": {"role": "cfo-1"}, "output": "ok", "ts": "2026-01-01T00:00:01+00:00"},
+        {"type": "llm", "role": "cfo-1", "iteration": 1, "usage": {"in": 10, "out": 5},
+         "ts": "2026-01-01T00:00:03+00:00"},
+        {"type": "turn_end", "reply": "done", "ts": "2026-01-01T00:00:04+00:00"},
+    ]
+    value = metrics.compute({**CTX, "events": answered})["handoff_latency"]["value"]
+    assert value == {"irina>cfo-1": {"value": 2000, "n": 1}}, value
 
 
 def test_a_seat_metric_carries_the_sample_it_was_drawn_from():
