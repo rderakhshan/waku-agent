@@ -134,6 +134,7 @@ def department_payload() -> dict:
 # Overview page (see department.js), so the rail keeps one entry for both.
 _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/home.js"></script>\n'
+           '<script src="/observation.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
 _AFTER = '<script src="/layout.js"></script>\n'
@@ -223,6 +224,15 @@ def _rail(html: str) -> str:
         '<span class="lbl">Home</span></a>\n  '
         '<a href="#overview" data-v="overview" data-short="W" aria-label="Work Desk">'
         '<span class="lbl">Work Desk</span></a>', 1)
+    # The Observation Lab is a page this launcher adds rather than one waku ships,
+    # so its row is inserted rather than retagged. It is marked as a fold member
+    # here because _fold() only retags rows that already exist in the shell.
+    html = html.replace(
+        '<a href="#compare/models"',
+        '<a data-grp="llmops" hidden href="#observation" data-v="observation" '
+        'data-short="L" aria-label="Observation Lab">'
+        '<span class="lbl">Observation Lab</span></a>\n  '
+        '<a href="#compare/models"', 1)
     for key, label, pages in _FOLDS:
         html = _fold(html, key, label, pages)
     return html
@@ -266,6 +276,10 @@ def _handler_class():
                 return
             if path == "/home.js":
                 body = (Path(__file__).parent / "static" / "home.js").read_bytes()
+                self._send(body, "text/javascript", no_cache=True)
+                return
+            if path == "/observation.js":
+                body = (Path(__file__).parent / "static" / "observation.js").read_bytes()
                 self._send(body, "text/javascript", no_cache=True)
                 return
             if path == "/irina-mark.svg":

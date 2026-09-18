@@ -229,4 +229,19 @@ def collect_department() -> dict:
                 "attributed to the seat that made them",
     }
     data["department"] = department
+    # The Observation Lab's instruments. Computed here rather than in a view so
+    # the same registry serves the page, the catalogue CLI and the eval — and so
+    # the numbers a reader sees are the ones the tests assert on.
+    from concentric import metrics
+
+    data["metrics"] = metrics.compute({
+        "events": events,
+        "stats": data.get("stats"),
+        "usage": data.get("usage"),
+        "department": department,
+        "db": data.get("db"),
+        "facts": data.get("facts"),
+        "chat_pending": data.get("chat_pending"),
+        "eval_report": data.get("eval_report"),
+    })
     return data

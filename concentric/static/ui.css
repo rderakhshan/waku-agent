@@ -700,3 +700,30 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 /* Icon-only rail: no room for a fold control, so show the rows as monograms,
    which is all a collapsed rail shows anyway. */
 .rail.collapsed > a[hidden]{display:flex}
+
+/* ---- Observation Lab.
+   The one page whose job is to be honest about what is NOT known, so the empty
+   state carries as much design as the filled one: a dash for a missing value,
+   and the sentence that says what would fill it. */
+.lab-verdict{font-size:var(--text-lg);line-height:var(--leading-snug);
+  color:var(--text-ink);margin:0;max-width:80ch}
+.lab-quiet{font-size:var(--text-base);color:var(--text-faint);margin:0}
+.lab-gap{font-size:var(--text-base);color:var(--text-faint);
+  margin:var(--space-3) 0 0}
+.lab-grid{display:grid;gap:var(--space-4);margin-bottom:var(--space-6);
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start}
+/* One instrument inside a lens: label and badge on one line, value under it,
+   and the reason it is empty under that. */
+.lab-row{padding:var(--space-3) 0;border-top:var(--rule-width) solid var(--rule)}
+.lab-row:first-child{border-top:0;padding-top:0}
+.lab-row-head{display:flex;align-items:baseline;justify-content:space-between;
+  gap:var(--space-3)}
+.lab-row-label{font-size:var(--text-sm);color:var(--text-ink)}
+.lab-row-value{display:flex;align-items:baseline;gap:var(--space-2);
+  margin-top:2px;min-width:0}
+.lab-row-value code{font-family:var(--face-mono);font-size:var(--text-base);
+  color:var(--text-ink);overflow-wrap:anywhere}
+.lab-row-unit{font-family:var(--face-mono);font-size:var(--text-xs);
+  color:var(--text-faint)}
+.lab-row-filler{font-size:var(--text-xs);color:var(--text-faint);
+  margin-top:3px;line-height:var(--leading-snug)}
