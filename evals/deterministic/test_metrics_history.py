@@ -176,3 +176,48 @@ def test_prune_keeps_what_is_inside_retention(conn):
     history.record(_registry(cost={"a": {"value": 1.0, "n": 1}}), metrics.AGG, conn=conn)
     history.prune(conn)
     assert conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0] == 1
+
+
+# --- the recorder ------------------------------------------------------------
+
+def test_the_recorder_never_raises(monkeypatch):
+    """It runs on a timer, unattended. A failure there must leave a gap in a
+    chart, not take the dashboard down with it."""
+    from concentric import dashboard
+
+    def boom():
+        raise RuntimeError("the seats are unreadable")
+
+    monkeypatch.setattr(metrics, "context", boom)
+    assert dashboard._record_once("timer") is None
+
+
+def test_the_recorder_writes_a_snapshot(monkeypatch, tmp_path):
+    from concentric import dashboard
+
+    monkeypatch.setattr(metrics, "context", lambda: {"events": CTX_EVENTS})
+    monkeypatch.setattr(history, "db_path", lambda: tmp_path / "m.db")
+    snapshot = dashboard._record_once("timer")
+    assert snapshot is not None
+    conn = history.connect(tmp_path / "m.db")
+    try:
+        row = conn.execute("SELECT reason, turns FROM snapshots WHERE id = ?",
+                           (snapshot,)).fetchone()
+        assert row["reason"] == "timer"
+        assert row["turns"] == 2
+        assert conn.execute("SELECT COUNT(*) FROM readings WHERE snapshot = ?",
+                            (snapshot,)).fetchone()[0] > 0
+    finally:
+        conn.close()
+
+
+CTX_EVENTS = [
+    {"type": "turn_start", "user_message": "q1", "ts": "2026-01-01T00:00:00+00:00"},
+    {"type": "llm", "role": "irina", "iteration": 1, "usage": {"in": 10, "out": 5},
+     "ts": "2026-01-01T00:00:01+00:00"},
+    {"type": "turn_end", "reply": "a1", "ts": "2026-01-01T00:00:02+00:00"},
+    {"type": "turn_start", "user_message": "q2", "ts": "2026-01-01T00:01:00+00:00"},
+    {"type": "llm", "role": "irina", "iteration": 1, "usage": {"in": 12, "out": 6},
+     "ts": "2026-01-01T00:01:01+00:00"},
+    {"type": "turn_end", "reply": "a2", "ts": "2026-01-01T00:01:02+00:00"},
+]

@@ -416,6 +416,59 @@ def _handler_class():
     return DepartmentHandler
 
 
+def _record_once(reason: str) -> int | None:
+    """Take one snapshot of the registry. Returns the snapshot id, or None.
+
+    Never raises: the recorder runs on a timer and a failure there must not take
+    the dashboard down with it. A missed snapshot is a gap in a chart; a dead
+    server is a dead server.
+    """
+    try:
+        from concentric import history, metrics
+
+        conn = history.connect()
+        try:
+            # One context, not two: it reads every seat's SQLite file, and asking
+            # for it twice doubled the cost of every snapshot.
+            ctx = metrics.context()
+            registry = metrics.compute(ctx)
+            turns = sum(1 for t in metrics._turns_of(ctx.get("events") or []) if len(t) > 1)
+            snapshot = history.record(registry, metrics.AGG, reason=reason,
+                                      turns=turns, conn=conn)
+            history.prune(conn)
+            return snapshot
+        finally:
+            conn.close()
+    except Exception:  # noqa: BLE001 — see the docstring
+        return None
+
+
+def _start_recorder() -> int:
+    """Snapshot the registry on a timer, so the history accumulates on its own.
+
+    The interval is `WAKU_METRICS_EVERY` minutes, default 15. Fifteen minutes is
+    four readings an hour: fine enough that a change has a time, coarse enough
+    that a day is a hundred rows rather than seventeen thousand.
+
+    The first snapshot is taken immediately, so the page has a baseline from the
+    moment it starts rather than from a quarter of an hour later.
+    """
+    import threading
+    import time
+
+    minutes = int(os.getenv("WAKU_METRICS_EVERY", "15") or "15")
+    if minutes <= 0:
+        return 0
+
+    def loop() -> None:
+        while True:
+            _record_once("timer")
+            time.sleep(minutes * 60)
+
+    threading.Thread(target=loop, name="metrics-recorder", daemon=True).start()
+    return minutes
+
+
 def main() -> None:
     from concentric import roster
     from waku.ops import dashboard as wd
@@ -423,6 +476,10 @@ def main() -> None:
     wd.Handler = _handler_class()   # before serve() binds it to the server
     print(f"Department dashboard - {len(roster.SEATS)} seats, Irina at "
           f"{seat_home(IRINA)}")
+    every = _start_recorder()
+    if every:
+        print(f"Metrics history - a snapshot every {every} min, "
+              f"into {seat_home(IRINA).parent.parent / 'metrics.db'}")
     wd.main()
 
 
