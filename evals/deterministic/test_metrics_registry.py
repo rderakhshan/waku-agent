@@ -164,3 +164,70 @@ def test_no_report_leaves_every_judge_slot_empty():
     reg = metrics.compute(CTX)
     for mid in metrics.JUDGE_METRICS:
         assert reg[mid]["value"] is None, f"{mid} has a value with no report"
+
+
+# --- the semantic metrics ----------------------------------------------------
+
+def test_bleu_is_one_for_an_identical_answer_and_zero_for_no_overlap():
+    assert metrics.bleu("the model is tiered", "the model is tiered") == 1.0
+    assert metrics.bleu("alpha beta", "gamma delta") == 0.0
+
+
+def test_rouge_is_recall_over_the_reference():
+    assert metrics.rouge("the model is tiered today", "the model is tiered") == 1.0
+    partial = metrics.rouge("the model", "the model is tiered")
+    assert 0 < partial < 1, partial
+
+
+def test_cosine_handles_parallel_orthogonal_and_empty_vectors():
+    from concentric import embeddings
+
+    assert round(embeddings.cosine([1, 0], [2, 0]), 6) == 1.0
+    assert embeddings.cosine([1, 0], [0, 1]) == 0.0
+    # A seat that said nothing has no position; 0 is the honest stand-in.
+    assert embeddings.cosine([0, 0], [1, 1]) == 0.0
+
+
+def _semantic_events(second_answer: str) -> list[dict]:
+    return [
+        {"type": "turn_start", "user_message": "q", "ts": "2026-01-01T00:00:00+00:00"},
+        {"type": "tool", "role": "irina", "tool": "delegate", "args": {"role": "a"},
+         "output": "alpha " + "x" * 60, "ts": "2026-01-01T00:00:01+00:00"},
+        {"type": "tool", "role": "irina", "tool": "delegate", "args": {"role": "b"},
+         "output": second_answer + " " + "y" * 60, "ts": "2026-01-01T00:00:02+00:00"},
+        {"type": "turn_end", "reply": "done", "ts": "2026-01-01T00:00:03+00:00"},
+    ]
+
+
+def _fake_vectors(monkeypatch):
+    from concentric import embeddings
+
+    monkeypatch.setattr(embeddings, "available", lambda: True)
+    monkeypatch.setattr(embeddings, "embed", lambda texts: [
+        [1.0, 0.0] if t.startswith("alpha") else [0.0, 1.0] for t in texts])
+
+
+def test_two_seats_saying_the_same_thing_converge(monkeypatch):
+    _fake_vectors(monkeypatch)
+    values = metrics._semantic_values(_semantic_events("alpha"))
+    assert values["stance_convergence"] == 1.0
+    assert values["semantic_diversity"] == 0.0
+
+
+def test_two_seats_disagreeing_do_not(monkeypatch):
+    _fake_vectors(monkeypatch)
+    values = metrics._semantic_values(_semantic_events("beta"))
+    assert values["stance_convergence"] == 0.0
+    assert values["semantic_diversity"] == 1.0
+
+
+def test_no_embedding_key_means_no_semantic_metrics(monkeypatch):
+    """The designed answer to a keyless install: None, with the filler saying
+    which variable would fix it. Never a zero."""
+    from concentric import embeddings
+
+    monkeypatch.setattr(embeddings, "available", lambda: False)
+    assert metrics._semantic_values(_semantic_events("alpha")) == {}
+    reg = metrics.compute({**CTX, "events": _semantic_events("alpha")})
+    for mid in ("stance_convergence", "stance_shift", "semantic_diversity"):
+        assert reg[mid]["value"] is None

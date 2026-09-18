@@ -16,10 +16,11 @@
   // Health and Memory came out of reading the first catalogue: those are the
   // four ways the same trace and state answer four different things.
   const LENSES = [
-    ["Health", "How it fails", [
+    ["Health", "How it fails, and whether it holds together", [
       "premature_terminations", "unanswered_handoffs", "step_repetition",
       "mandate_breaches", "mast_reasoning_action_mismatch",
-      "mast_information_withholding", "mast_annotator_agreement"]],
+      "mast_information_withholding", "mast_annotator_agreement",
+      "stance_convergence", "stance_shift", "semantic_diversity"]],
     ["Effort", "Where the time and money go", [
       "cost", "cost_per_ring", "latency_avg", "latency_p95", "throughput",
       "tokens_in", "tokens_out", "context_growth", "tool_errors"]],
@@ -28,7 +29,8 @@
       "consultations", "peer_pairs_used", "gate_retrieval_ratio"]],
     ["Memory", "What the ecosystem learns", [
       "memory_growth", "fact_writers", "seats_without_memory", "idle_seats",
-      "consolidation_backlog", "context_retention", "factual_grounding"]],
+      "consolidation_backlog", "context_retention", "factual_grounding",
+      "bleu_rouge_meteor", "bertscore"]],
   ];
 
   // Health is the one lens whose numbers are all bad news when they are high, so

@@ -26,9 +26,12 @@ None until a batch run fills them.
 from __future__ import annotations
 
 import json
+import math
+import re
 import statistics
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from typing import Any
 
@@ -54,9 +57,9 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "higher",
      "source": "eval",
      "filler": "per-case tool and arg matching, exported from the deterministic suite"},
-    {"id": "average_reward", "label": "Average reward", "state": "ready",
+    {"id": "average_reward", "label": "Average reward", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "score", "direction": "higher",
-     "source": "judge", "filler": "the judge suite's 0-1 scores, averaged"},
+     "source": "judge", "filler": "a batch run: python -m concentric.metrics --run"},
     {"id": "pass_at_k", "label": "Pass@k", "state": "ready",
      "kind": "scalar", "changes": "per-run", "unit": "probability", "direction": "higher",
      "source": "eval", "filler": "each dataset case run k times"},
@@ -116,13 +119,13 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "kind": "scalar", "changes": "per-turn", "unit": "calls", "direction": "lower",
      "source": "trace", "filler": "a seat with a declared tool list"},
     {"id": "mast_reasoning_action_mismatch", "label": "MAST: reasoning-action mismatch",
-     "state": "ready", "kind": "scalar", "changes": "per-run", "unit": "traces",
+     "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "traces",
      "direction": "lower", "source": "judge",
-     "filler": "a labeling judge over multi-agent traces"},
+     "filler": "a batch run: python -m concentric.metrics --run"},
     {"id": "mast_information_withholding", "label": "MAST: information withholding",
-     "state": "ready", "kind": "scalar", "changes": "per-run", "unit": "traces",
+     "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "traces",
      "direction": "lower", "source": "judge",
-     "filler": "the same judge, a different label"},
+     "filler": "a batch run: python -m concentric.metrics --run"},
     {"id": "mast_annotator_agreement", "label": "Cohen's kappa (labeler agreement)",
      "state": "ready", "kind": "scalar", "changes": "per-run", "unit": "kappa",
      "direction": "higher", "source": "judge",
@@ -185,23 +188,35 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "kind": "scalar", "changes": "rarely", "unit": "score", "direction": "higher",
      "source": "human", "filler": "the ten-question System Usability Scale, answered by a person"},
 
-    # -- semantic (needs vectors this repository does not produce) ------------
-    {"id": "stance_convergence", "label": "Final stance convergence", "state": "blocked",
+    # -- semantic: wired, waiting on an embedding key and a batch run --------
+    #
+    # The openai client is already a core dependency, so nothing is installed
+    # here. What is missing is OPENAI_API_KEY — the same variable the Supabase
+    # and LangMem memory backends already use for their embeddings.
+    {"id": "stance_convergence", "label": "Final stance convergence", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "cosine", "direction": "higher",
-     "source": "judge", "filler": "an embedding provider; no public embed(text) exists"},
-    {"id": "stance_shift", "label": "Total stance shift", "state": "blocked",
+     "source": "judge",
+     "filler": "OPENAI_API_KEY, then a batch run: the seats' answers are embedded "
+               "and compared pairwise"},
+    {"id": "stance_shift", "label": "Total stance shift", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "cosine", "direction": "neutral",
-     "source": "judge", "filler": "the same embedding provider"},
-    {"id": "semantic_diversity", "label": "Semantic diversity", "state": "blocked",
+     "source": "judge",
+     "filler": "OPENAI_API_KEY, then a batch run: one seat's first answer against "
+               "its last"},
+    {"id": "semantic_diversity", "label": "Semantic diversity", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "cosine", "direction": "neutral",
-     "source": "judge", "filler": "the same embedding provider"},
-    {"id": "bertscore", "label": "BERTScore", "state": "blocked",
+     "source": "judge",
+     "filler": "OPENAI_API_KEY, then a batch run: the same cosines as convergence, "
+               "read the other way"},
+    {"id": "bertscore", "label": "BERTScore", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "score", "direction": "higher",
-     "source": "judge", "filler": "the same embedding provider"},
-    {"id": "bleu_rouge_meteor", "label": "BLEU / ROUGE / METEOR", "state": "blocked",
+     "source": "judge",
+     "filler": "gold references in references.jsonl, plus an embedding key"},
+    {"id": "bleu_rouge_meteor", "label": "BLEU / ROUGE / METEOR", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "score", "direction": "higher",
      "source": "external",
-     "filler": "gold reference answers, which do not exist for an open-ended risk judgement"},
+     "filler": "gold references in references.jsonl; BLEU and ROUGE are implemented "
+               "and waiting, METEOR needs a synonym table and is not"},
 
     # -- benchmarks -----------------------------------------------------------
     {"id": "bench_code", "label": "Benchmark: code and software engineering",
@@ -506,6 +521,223 @@ def _context_growth(events: list[dict]) -> dict[str, int] | None:
     return {str(k): round(statistics.mean(v)) for k, v in sorted(acc.items())}
 
 
+# --- the seats' own answers --------------------------------------------------
+#
+# A delegate call's output IS the child's reply — it is what came back to the
+# parent — so the trace already holds every seat's position. The children's own
+# turns are not in it, and for these metrics they do not need to be.
+
+def _turn_answers(events: list[dict]) -> list[list[str]]:
+    """The seats' answers, one list per turn, for turns where two seats spoke.
+    Convergence and diversity are questions about a group, so a turn with one
+    answer is not one."""
+    out = []
+    for turn in _turns_of(events):
+        answers = [(ev.get("output") or "").strip() for ev in turn
+                   if ev.get("type") == "tool" and ev.get("tool") == "delegate"]
+        answers = [a for a in answers if len(a) > 40]
+        if len(answers) >= 2:
+            out.append(answers)
+    return out
+
+
+def _seat_answers(events: list[dict]) -> dict[str, list[str]]:
+    """Each seat's answers in order, across the whole corpus. Stance shift is a
+    question about one seat over time, so it needs this shape rather than the
+    per-turn one."""
+    out: dict[str, list[str]] = {}
+    for turn in _turns_of(events):
+        for ev in turn:
+            if ev.get("type") != "tool" or ev.get("tool") != "delegate":
+                continue
+            target = (ev.get("args") or {}).get("role")
+            text = (ev.get("output") or "").strip()
+            if target and len(text) > 40:
+                out.setdefault(target, []).append(text)
+    return out
+
+
+def _replies(events: list[dict]) -> dict[str, str]:
+    """What the department was asked and what it finally said, per turn — the
+    only shape a reference answer can be matched against."""
+    out: dict[str, str] = {}
+    for turn in _turns_of(events):
+        ask = next((e.get("user_message") for e in turn
+                    if e.get("type") == "turn_start"), None)
+        reply = next((e.get("reply") for e in reversed(turn)
+                      if e.get("type") == "turn_end"), None)
+        if ask and reply:
+            out[ask] = reply
+    return out
+
+
+# --- reference-scored text metrics -------------------------------------------
+#
+# BLEU and ROUGE are n-gram overlap against a gold answer. They need no package:
+# the whole of BLEU-4 is a precision, a brevity penalty and a geometric mean.
+
+def _tokens(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", (text or "").lower())
+
+
+def _ngrams(tokens: list[str], n: int) -> Counter:
+    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))
+
+
+def bleu(hypothesis: str, reference: str, max_n: int = 4) -> float | None:
+    """Brevity-penalised n-gram precision, add-one smoothed above unigrams so a
+    single sentence still scores."""
+    hyp, ref = _tokens(hypothesis), _tokens(reference)
+    if not hyp or not ref:
+        return None
+    log_sum = 0.0
+    for n in range(1, max_n + 1):
+        hg, rg = _ngrams(hyp, n), _ngrams(ref, n)
+        overlap = sum(min(count, rg[gram]) for gram, count in hg.items())
+        total = sum(hg.values())
+        precision = ((overlap + 1) / (total + 1)) if n > 1 else (overlap / total)
+        if precision <= 0:
+            return 0.0
+        log_sum += math.log(precision) / max_n
+    penalty = min(1.0, math.exp(1 - len(ref) / len(hyp))) if len(hyp) < len(ref) else 1.0
+    return round(penalty * math.exp(log_sum), 4)
+
+
+def rouge(hypothesis: str, reference: str, max_n: int = 2) -> float | None:
+    """ROUGE-N recall, averaged over unigrams and bigrams."""
+    hyp, ref = _tokens(hypothesis), _tokens(reference)
+    if not hyp or not ref:
+        return None
+    scores = []
+    for n in range(1, max_n + 1):
+        hg, rg = _ngrams(hyp, n), _ngrams(ref, n)
+        overlap = sum(min(count, rg[gram]) for gram, count in hg.items())
+        total = sum(rg.values())
+        scores.append(overlap / total if total else 0.0)
+    return round(sum(scores) / len(scores), 4)
+
+
+def references_path():
+    """One JSON object per line: {"input": "...", "reference": "..."}.
+
+    Nothing writes this yet. It is the shape a gold answer set would take, and
+    the metric stays None until one exists — for an open-ended risk judgement
+    there may never be one right answer, which is why this is a file a person
+    authors rather than something the harness can generate.
+    """
+    _home_env()
+    from waku.config import load_settings
+
+    settings = load_settings()
+    settings.ensure_home()
+    return settings.home / "references.jsonl"
+
+
+def _bertscores(replies: dict[str, str], gold: dict[str, str]) -> list[float]:
+    """BERTScore, reduced to what it is: the cosine similarity between a reply's
+    embedding and its reference's."""
+    from concentric import embeddings
+
+    if not embeddings.available():
+        return []
+    asks = [a for a in replies if gold.get(a.strip())]
+    if not asks:
+        return []
+    vectors = embeddings.embed([replies[a] for a in asks]
+                               + [gold[a.strip()] for a in asks])
+    if not vectors:
+        return []
+    half = len(asks)
+    return [embeddings.cosine(vectors[i], vectors[half + i]) for i in range(half)]
+
+
+def _reference_values(events: list[dict]) -> dict:
+    """BLEU, ROUGE and BERTScore against gold answers, if any have been authored.
+
+    All three need the same missing input, so they are computed together and
+    left out together. A metric scored against whatever text happened to be
+    nearby would be worse than no metric.
+    """
+    path = references_path()
+    if not path.exists():
+        return {}
+    try:
+        pairs = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
+                 if line.strip()]
+    except (OSError, json.JSONDecodeError):
+        return {}
+    gold = {p.get("input", "").strip(): p.get("reference", "") for p in pairs}
+    if not gold:
+        return {}
+    replies = _replies(events)
+    bleus, rouges = [], []
+    for ask, reply in replies.items():
+        ref = gold.get(ask.strip())
+        if not ref:
+            continue
+        b, r = bleu(reply, ref), rouge(reply, ref)
+        if b is not None:
+            bleus.append(b)
+        if r is not None:
+            rouges.append(r)
+    out = {}
+    if bleus and rouges:
+        out["bleu_rouge_meteor"] = round(
+            (sum(bleus) + sum(rouges)) / (len(bleus) + len(rouges)), 4)
+    berts = _bertscores(replies, gold)
+    if berts:
+        out["bertscore"] = round(sum(berts) / len(berts), 4)
+    return out
+
+
+def _semantic_values(events: list[dict]) -> dict:
+    """Convergence, shift and diversity, over the seats' own answers.
+
+    Convergence and diversity are the same pairwise cosines read two ways: how
+    much a group agreed, and how much it did not. Shift is one seat's first
+    answer against its last, which is the closest this corpus gets to the
+    taxonomy's before-and-after — a seat here answers a task, not a debate, so
+    its position moves between turns rather than inside one.
+    """
+    from concentric import embeddings
+
+    if not embeddings.available():
+        return {}
+    turns = _turn_answers(events)
+    seats = _seat_answers(events)
+    texts = sorted({t for group in turns for t in group}
+                   | {t for group in seats.values() for t in group})
+    if len(texts) < 2:
+        return {}
+    vectors = embeddings.embed(texts)
+    if not vectors:
+        return {}
+    vec = dict(zip(texts, vectors))
+
+    agreement, spread = [], []
+    for group in turns:
+        pairs = [embeddings.cosine(vec[a], vec[b]) for i, a in enumerate(group)
+                 for b in group[i + 1:]]
+        if pairs:
+            agreement.append(sum(pairs) / len(pairs))
+            spread.append(1 - sum(pairs) / len(pairs))
+
+    shifts = []
+    for answers in seats.values():
+        first, last = answers[0], answers[-1]
+        if len(answers) >= 2 and first in vec and last in vec:
+            shifts.append(1 - embeddings.cosine(vec[first], vec[last]))
+
+    out = {}
+    if agreement:
+        out["stance_convergence"] = round(sum(agreement) / len(agreement), 4)
+    if spread:
+        out["semantic_diversity"] = round(sum(spread) / len(spread), 4)
+    if shifts:
+        out["stance_shift"] = round(sum(shifts) / len(shifts), 4)
+    return out
+
+
 # --- the batch report --------------------------------------------------------
 #
 # The metrics that need a reader cannot run in the 5s poll, so they run when
@@ -516,7 +748,9 @@ def _context_growth(events: list[dict]) -> dict[str, int] | None:
 # Which slots the report is allowed to fill. Listing them means a stray key in
 # the file cannot quietly become a measurement.
 JUDGE_METRICS = ("average_reward", "mast_reasoning_action_mismatch",
-                 "mast_information_withholding")
+                 "mast_information_withholding",
+                 "stance_convergence", "stance_shift", "semantic_diversity",
+                 "bertscore", "bleu_rouge_meteor")
 
 
 def _home_env() -> None:
@@ -633,6 +867,11 @@ def run(limit: int = 20) -> dict:
 
     values: dict[str, Any] = dict(hits)
     values["average_reward"] = round(sum(rewards) / len(rewards), 4) if rewards else None
+    # The semantic and reference metrics need the same turn data, so they ride
+    # the same run rather than each paying for their own pass over the corpus.
+    events = ctx.get("events") or []
+    values.update(_semantic_values(events))
+    values.update(_reference_values(events))
 
     record = {
         "ran_at": datetime.now().astimezone().isoformat(timespec="seconds"),
