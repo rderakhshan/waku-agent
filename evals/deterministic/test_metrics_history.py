@@ -289,3 +289,144 @@ def test_a_run_moves_the_bookmark_and_records_its_reading(monkeypatch, tmp_path)
     assert metrics.estimate_calls(CTX_EVENTS, 20,
                                   history.get_mark(history.connect(tmp_path / "metrics.db"),
                                                    "last_scored_ts")) == 0
+
+
+# --- the eval loop: a regression is a claim, and a claim needs a case --------
+#
+# Both bugs below shipped, both were silent, and nothing caught either. They live
+# here rather than in a changelog because a changelog does not fail.
+
+def _record_at(conn, mid, value, days_ago, subject="a"):
+    """One reading, dated, so two of them land in different buckets."""
+    sid = history.record(_registry(**{mid: {subject: {"value": value, "n": 1}}}),
+                         metrics.AGG, conn=conn)
+    ts = (datetime.now(UTC) - timedelta(days=days_ago)).isoformat(timespec="seconds")
+    conn.execute("UPDATE snapshots SET ts = ? WHERE id = ?", (ts, sid))
+    conn.commit()
+    return sid
+
+
+def _moved(conn, mid, start, end, days_ago, subject="a"):
+    """A counter's movement inside one bucket, which takes two readings.
+
+    A counter is a running total over the whole corpus, so its bucket's answer is
+    how far it travelled — and one reading cannot say that. It is also why a
+    regression for a counter is a LARGER move than the bucket before, not a
+    higher number.
+    """
+    _record_at(conn, mid, start, days_ago, subject)
+    _record_at(conn, mid, end, days_ago, subject)
+
+
+def test_a_regression_is_a_move_against_the_direction(conn):
+    """`step_repetition` is a metric where lower is better, so a bigger move is
+    the bad one. Without the registry's direction a chart can only say the number
+    changed, and a change is not a finding."""
+    _moved(conn, "step_repetition", 0.0, 2.0, days_ago=1)
+    _moved(conn, "step_repetition", 2.0, 9.0, days_ago=0)
+    found = history.regressions("daily", conn=conn)
+    assert [r["metric"] for r in found] == ["step_repetition"]
+    assert found[0]["was"] == 2.0 and found[0]["now"] == 7.0
+
+
+def test_a_metric_improving_is_not_a_regression(conn):
+    """The same two buckets the other way round. A store that flagged any change
+    would report this one too, and every fix would read as a fault."""
+    _moved(conn, "step_repetition", 0.0, 9.0, days_ago=1)
+    _moved(conn, "step_repetition", 9.0, 11.0, days_ago=0)
+    assert history.regressions("daily", conn=conn) == []
+
+
+def test_a_metric_that_has_not_said_which_way_is_better_cannot_regress(conn):
+    """`neutral` is a refusal to have an opinion, not a missing one. Guessing one
+    turns noise into a finding with a colour."""
+    neutral = next(s["id"] for s in metrics.SLOTS
+                   if s.get("direction") == "neutral" and s["id"] in metrics.AGG)
+    _moved(conn, neutral, 1.0, 2.0, days_ago=1)
+    _moved(conn, neutral, 2.0, 99.0, days_ago=0)
+    assert history.regressions("daily", conn=conn) == []
+
+
+def test_one_bucket_is_not_a_regression(conn):
+    """A change needs two buckets. One is a fact about the present, not a move
+    away from anything."""
+    _moved(conn, "step_repetition", 0.0, 9.0, days_ago=0)
+    assert history.regressions("daily", conn=conn) == []
+
+
+def test_a_move_off_zero_sorts_above_a_measurable_one(conn):
+    """Relative change is the only thing comparable across metrics — a cent and a
+    millisecond do not share a scale. A series leaving zero has no baseline to be
+    relative to, so it has to sort somewhere, and "new" beats "worse by a known
+    amount"."""
+    _moved(conn, "step_repetition", 0.0, 0.0, days_ago=1)
+    _moved(conn, "step_repetition", 0.0, 3.0, days_ago=0)
+    _moved(conn, "tool_errors", 0.0, 10.0, days_ago=1)
+    _moved(conn, "tool_errors", 10.0, 30.0, days_ago=0)
+    found = history.regressions("daily", conn=conn)
+    assert found[0]["metric"] == "step_repetition"
+    assert found[0]["relative"] is None
+    # 10 repeats of movement a bucket, then 20: double, so +100%.
+    assert found[1]["relative"] == 1.0
+
+
+# --- the cause: which turns fed the number -----------------------------------
+#
+# The panel this feeds was dead on arrival and said nothing about it: the check
+# compared the cause's subject against the seat OBJECT, and a role string never
+# equals an object, so it was false every time.
+
+CAUSE_EVENTS = [
+    {"type": "turn_start", "user_message": "tier the model", "ts": "2026-01-01T00:00:00+00:00"},
+    {"type": "tool", "role": "irina", "tool": "save_note", "args": {"text": "a"},
+     "ts": "2026-01-01T00:00:01+00:00"},
+    {"type": "tool", "role": "irina", "tool": "save_note", "args": {"text": "a"},
+     "ts": "2026-01-01T00:00:02+00:00"},
+    {"type": "turn_end", "reply": "done", "ts": "2026-01-01T00:00:03+00:00"},
+    {"type": "turn_start", "user_message": "and again", "ts": "2026-01-01T00:01:00+00:00"},
+    {"type": "tool", "role": "cfo-1-development", "tool": "manage_memory", "args": {},
+     "ts": "2026-01-01T00:01:01+00:00"},
+    {"type": "turn_end", "reply": "done", "ts": "2026-01-01T00:01:02+00:00"},
+]
+
+CAUSE_DEPT = {"seats": [
+    {"role": "irina", "tools": ["save_note"]},
+    {"role": "cfo-1-development", "tools": ["manage_memory"]},
+]}
+
+
+def test_the_cause_keeps_every_turn_when_there_is_no_upper_bound():
+    """`_after(ts, None)` is True — "after nothing" — which is the right answer
+    for a lower bound and the wrong one for an upper bound. Used as one, it
+    skipped every turn and every cause came back empty, with no error anywhere
+    and a panel that blamed a window that was never empty."""
+    turns = metrics.contributions("step_repetition", "", None, None,
+                                  CAUSE_EVENTS, CAUSE_DEPT)
+    assert len(turns) == 2
+
+
+def test_an_upper_bound_still_excludes_later_turns():
+    """The fix must not have removed the bound it was guarding."""
+    turns = metrics.contributions("step_repetition", "", None,
+                                  "2026-01-01T00:00:30+00:00", CAUSE_EVENTS, CAUSE_DEPT)
+    assert len(turns) == 1
+
+
+def test_the_cause_only_lists_turns_that_involved_the_seat():
+    """The panel opens on one seat. A seat that never acted in the window has no
+    turns, and saying so is the honest answer — attributing the department's
+    turns to whoever was clicked would blame the wrong seat."""
+    assert metrics.contributions("step_repetition", "irina", None, None,
+                                 CAUSE_EVENTS, CAUSE_DEPT)
+    assert metrics.contributions("step_repetition", "cfo-2-operations", None, None,
+                                 CAUSE_EVENTS, CAUSE_DEPT) == []
+
+
+def test_a_metric_with_no_contribution_function_reports_no_value():
+    """The turns are still listed — they ARE the window — but with no number
+    rather than a made-up zero, which is the rule the registry follows
+    everywhere else."""
+    turns = metrics.contributions("success_rate", "", None, None,
+                                  CAUSE_EVENTS, CAUSE_DEPT)
+    assert turns
+    assert all(t["value"] is None for t in turns)

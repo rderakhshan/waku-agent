@@ -292,6 +292,88 @@ def subjects(metric: str, conn: sqlite3.Connection | None = None) -> list[str]:
             conn.close()
 
 
+# --- the eval loop -----------------------------------------------------------
+#
+# A chart can say a number moved. It cannot say that moving was bad, which is
+# what the registry's `direction` is for, and a change against it is the only
+# thing here worth calling a regression.
+#
+# This is where the store stops being a record and becomes a loop. A regression
+# is a claim about the department, and a claim is worth nothing until something
+# fails when it stops being true. So the fix for one is a deterministic eval:
+# the case goes in `evals/deterministic/`, and it stays red until the department
+# stops doing the thing. Both bugs this module has already shipped were that
+# shape — silent, wrong, and caught by nothing — which is why the cases pinning
+# them live beside this function rather than in a changelog.
+
+def regressions(granularity: str = "daily", since: str | None = None,
+                min_n: int = 1, conn: sqlite3.Connection | None = None) -> list[dict]:
+    """The series that moved the wrong way in their last bucket, worst first.
+
+    A metric that has not declared which way is better cannot regress. `neutral`
+    is not a missing opinion to be guessed at; it is a refusal to have one, and
+    inventing one turns noise into a finding with a colour.
+
+    Ranked by relative change, because that is the only thing comparable across
+    metrics — a cent and a millisecond do not share a scale. A series that moved
+    off zero has no baseline to be relative to, so it sorts first: a metric
+    leaving zero is unambiguously something new.
+    """
+    from concentric import metrics
+
+    own = conn is None
+    conn = conn or connect()
+    try:
+        direction = {slot["id"]: slot.get("direction", "neutral")
+                     for slot in metrics.SLOTS}
+        pairs = conn.execute("SELECT DISTINCT metric, subject FROM readings "
+                             "ORDER BY metric, subject").fetchall()
+        found: list[dict] = []
+        for row in pairs:
+            metric, subject = row["metric"], row["subject"]
+            way = direction.get(metric, "neutral")
+            if way not in ("higher", "lower"):
+                continue
+            points = [p for p in series(metric, subject, granularity, since,
+                                        metrics.AGG.get(metric, "last"),
+                                        conn)["points"] if p["value"] is not None]
+            # Two buckets, because a change needs two. One reading is a fact
+            # about the present, not a move away from anything.
+            if len(points) < 2:
+                continue
+            was, now = points[-2], points[-1]
+            if now["n"] < min_n:
+                continue
+            change = now["value"] - was["value"]
+            if change == 0:
+                continue
+            if (change < 0) if way == "higher" else (change > 0):
+                slot = metrics.registry()[metric]
+                found.append({
+                    "metric": metric,
+                    "label": slot.get("label", metric),
+                    "subject": subject,
+                    "direction": way,
+                    "unit": slot.get("unit", ""),
+                    "was": was["value"],
+                    "now": now["value"],
+                    "change": change,
+                    "relative": (abs(change) / abs(was["value"])
+                                 if was["value"] else None),
+                    "bucket": now["bucket"],
+                    "n": now["n"],
+                })
+        # `is not None` first, so a move off zero (no baseline) sorts above every
+        # measurable one, then the largest relative move.
+        found.sort(key=lambda r: (r["relative"] is not None,
+                                  -(r["relative"] or 0.0),
+                                  r["metric"], r["subject"]))
+        return found
+    finally:
+        if own:
+            conn.close()
+
+
 def main() -> None:
     import argparse
     import sys
@@ -312,6 +394,8 @@ def main() -> None:
     parser.add_argument("--record", action="store_true",
                         help="take a snapshot now, without calling a model")
     parser.add_argument("--prune", action="store_true")
+    parser.add_argument("--regressions", action="store_true",
+                        help="the series that moved the wrong way, worst first")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -323,6 +407,21 @@ def main() -> None:
         return
     if args.prune:
         print(json.dumps(prune(conn), indent=2))
+        return
+    if args.regressions:
+        rows = regressions(args.granularity, args.since, conn=conn)
+        if args.json:
+            print(json.dumps(rows, indent=2))
+            return
+        if not rows:
+            print(f"nothing moved the wrong way ({args.granularity})")
+            return
+        print(f"regressions - {args.granularity}")
+        for r in rows:
+            moved = (f"{r['relative'] * 100:+.0f}%"
+                     if r["relative"] is not None else "off zero")
+            print(f"  {r['metric']:<24} {r['subject'] or '(all)':<18} "
+                  f"{r['was']} -> {r['now']}  {moved}  ({r['bucket']})")
         return
     if not args.metric:
         rows = conn.execute(
