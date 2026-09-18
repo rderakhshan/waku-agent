@@ -347,6 +347,35 @@ def _handler_class():
                 self._send(_inject(html).encode("utf-8"),
                            "text/html; charset=utf-8", no_cache=True)
                 return
+            if path == "/api/metrics/history":
+                # One series, not the whole history: the Lab asks per metric when
+                # it draws a trend, and shipping every series in the payload would
+                # make the 5s poll carry a database.
+                from urllib.parse import parse_qs
+
+                from concentric import history
+                from concentric import metrics as metric_mod
+
+                query = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                metric = (query.get("metric") or [""])[0]
+                if not metric:
+                    self._send(json.dumps({"error": "metric is required"}).encode(),
+                               "application/json", no_cache=True)
+                    return
+                try:
+                    result = history.series(
+                        metric,
+                        (query.get("subject") or [""])[0],
+                        (query.get("granularity") or ["daily"])[0],
+                        (query.get("since") or [None])[0],
+                        metric_mod.AGG.get(metric, "last"))
+                except ValueError as exc:
+                    self._send(json.dumps({"error": str(exc)}).encode(),
+                               "application/json", no_cache=True)
+                    return
+                self._send(json.dumps(result).encode("utf-8"),
+                           "application/json", no_cache=True)
+                return
             if path == "/api/data":
                 from concentric.collect import collect_department
 

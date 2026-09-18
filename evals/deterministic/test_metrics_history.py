@@ -20,7 +20,7 @@ import pytest
 
 from concentric import history, metrics
 
-REQUIRED_AGG = {"sum", "mean"}
+REQUIRED_AGG = {"delta", "last"}
 
 
 def _registry(**values) -> dict:
@@ -51,13 +51,18 @@ def test_every_slot_declares_how_it_aggregates():
         assert how in REQUIRED_AGG, f"{mid} aggregates as {how!r}"
 
 
-def test_counts_sum_and_ratios_average():
-    """A spot check against the meaning, not the map. A week of repeats is the
-    repeats in that week; a week of latencies is a mean."""
+def test_counters_delta_and_levels_last():
+    """A spot check against the meaning, not the map.
+
+    Every metric here is computed over the whole corpus, so a reading is a
+    snapshot of a running total. A counter's bucket is therefore how much it
+    MOVED; a level's bucket is where it ENDED UP. Neither is a sum, and the first
+    version of this map said sum — it drew 255 for a metric whose value was 15.
+    """
     for mid in ("step_repetition", "tool_errors", "cost", "tokens_in", "consultations"):
-        assert metrics.AGG[mid] == "sum", mid
+        assert metrics.AGG[mid] == "delta", mid
     for mid in ("latency_avg", "factual_grounding", "average_reward", "hallucination_rate"):
-        assert metrics.AGG[mid] == "mean", mid
+        assert metrics.AGG[mid] == "last", mid
 
 
 # --- flattening --------------------------------------------------------------
@@ -95,39 +100,49 @@ def test_a_slot_with_no_value_writes_nothing():
 
 def test_record_then_read_gives_the_value_back(conn):
     history.record(_registry(cost={"a": {"value": 1.5, "n": 3}}), metrics.AGG, conn=conn)
-    result = history.series("cost", "a", "daily", agg="sum", conn=conn)
+    result = history.series("cost", "a", "daily", agg="last", conn=conn)
     assert [p["value"] for p in result["points"]] == [1.5]
     assert result["points"][0]["n"] == 3
 
 
-def test_two_snapshots_make_a_series(conn):
+def test_a_counter_reports_how_much_it_moved(conn):
+    """Two readings of a running total, so the bucket's answer is the change —
+    1.0 to 2.0 is one unit of activity, not three."""
     history.record(_registry(cost={"a": {"value": 1.0, "n": 1}}), metrics.AGG, conn=conn)
     history.record(_registry(cost={"a": {"value": 2.0, "n": 1}}), metrics.AGG, conn=conn)
-    result = history.series("cost", "a", "daily", agg="sum", conn=conn)
-    assert result["points"][0]["value"] == 3.0, "two readings in one day did not sum"
-    assert result["points"][0]["n"] == 2
+    result = history.series("cost", "a", "daily", agg="delta", conn=conn)
+    assert result["points"][0]["value"] == 1.0
+    assert result["points"][0]["n"] == 1
 
 
-def test_sum_and_mean_give_different_answers_on_the_same_data(conn):
-    """The whole reason the rule is declared rather than assumed."""
+def test_one_reading_is_no_change_rather_than_zero(conn):
+    """A change needs two readings. Reporting zero would say "nothing happened"
+    about a period nobody watched — the same lie as a placeholder drawn as a
+    zero, one layer up."""
+    history.record(_registry(cost={"a": {"value": 1.0, "n": 1}}), metrics.AGG, conn=conn)
+    result = history.series("cost", "a", "daily", agg="delta", conn=conn)
+    assert result["points"][0]["value"] is None
+    assert result["points"][0]["n"] == 0
+
+
+def test_a_level_reports_where_it_ended_up(conn):
+    """A mean does not accumulate, so the bucket's answer is the latest reading
+    rather than the distance travelled."""
     history.record(_registry(latency_avg={"a": {"value": 10.0, "n": 1}}),
                    metrics.AGG, conn=conn)
     history.record(_registry(latency_avg={"a": {"value": 20.0, "n": 3}}),
                    metrics.AGG, conn=conn)
-    summed = history.series("latency_avg", "a", "daily", agg="sum", conn=conn)
-    averaged = history.series("latency_avg", "a", "daily", agg="mean", conn=conn)
-    assert summed["points"][0]["value"] == 30.0
-    # weighted by the samples: (10*1 + 20*3) / 4 = 17.5, not (10+20)/2 = 15
-    assert averaged["points"][0]["value"] == 17.5
+    result = history.series("latency_avg", "a", "daily", agg="last", conn=conn)
+    assert result["points"][0]["value"] == 20.0
 
 
-def test_a_metric_with_no_samples_falls_back_to_a_plain_mean(conn):
+def test_a_level_with_no_samples_still_reads(conn):
     """A value with no n is still worth recording; inventing a weight for it
     would not be."""
     history.record(_registry(consolidation_backlog=4), metrics.AGG, conn=conn)
     history.record(_registry(consolidation_backlog=8), metrics.AGG, conn=conn)
-    result = history.series("consolidation_backlog", "", "daily", agg="mean", conn=conn)
-    assert result["points"][0]["value"] == 6.0
+    result = history.series("consolidation_backlog", "", "daily", agg="last", conn=conn)
+    assert result["points"][0]["value"] == 8.0
 
 
 # --- buckets -----------------------------------------------------------------
@@ -135,7 +150,7 @@ def test_a_metric_with_no_samples_falls_back_to_a_plain_mean(conn):
 def test_every_granularity_produces_a_bucket(conn):
     history.record(_registry(cost={"a": {"value": 1.0, "n": 1}}), metrics.AGG, conn=conn)
     for granularity in history.BUCKETS:
-        result = history.series("cost", "a", granularity, agg="sum", conn=conn)
+        result = history.series("cost", "a", granularity, agg="last", conn=conn)
         assert result["points"], f"{granularity} produced nothing"
         assert result["points"][0]["bucket"]
 
@@ -150,7 +165,7 @@ def test_the_baseline_needs_a_few_points_before_it_claims_one(conn):
     everything outside them as unusual."""
     for value in (1.0, 2.0):
         history.record(_registry(cost={"a": {"value": value, "n": 1}}), metrics.AGG, conn=conn)
-    assert history.series("cost", "a", "daily", agg="sum", conn=conn)["baseline"] is None
+    assert history.series("cost", "a", "daily", agg="last", conn=conn)["baseline"] is None
 
 
 # --- marks and retention -----------------------------------------------------

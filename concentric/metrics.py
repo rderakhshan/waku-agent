@@ -340,71 +340,74 @@ LEVELS: dict[str, str] = {
 }
 
 
-# How a metric behaves when it is summed over a time bucket.
+# How a metric behaves across a time bucket.
 #
-#   sum    a count or a total. A week of repeats is the repeats in that week.
-#   mean   a ratio, a time or a score. A week of latencies is the mean latency of
-#          the turns in it, weighted by how many there were.
+#   delta   the metric only grows — a counter. Its reading is a running total
+#           over the whole corpus, so the bucket's answer is the CHANGE across
+#           it: repeats went 10 -> 15, so five happened in that hour.
+#   last    the metric is a level or a running mean. Its reading already IS the
+#           answer, so the bucket takes the most recent one.
 #
-# Getting this wrong is the quietest way a trend chart lies. Summing latencies
-# gives a number with no unit; averaging a week of counts gives one with no
-# meaning. There is no universal rule — it depends on the metric — so it is
-# declared here, once, and an eval checks that every slot is covered.
+# Neither of these is sum or mean, and getting it wrong is the quietest way a
+# trend chart lies. Every metric here is computed over the whole corpus, so a
+# reading is a snapshot of a running total — summing three snapshots of "15
+# repeats" gives 45 and describes nothing. The first version of this map said sum
+# and mean, and the first series it drew was 255.
 AGG: dict[str, str] = {
-    # counts and totals
-    "tokens_in": "sum",
-    "tokens_out": "sum",
-    "cost": "sum",
-    "cost_per_ring": "sum",
-    "tool_errors": "sum",
-    "step_repetition": "sum",
-    "premature_terminations": "sum",
-    "mandate_breaches": "sum",
-    "unanswered_handoffs": "sum",
-    "consultations": "sum",
-    "peer_pairs_used": "sum",
-    "mast_reasoning_action_mismatch": "sum",
-    "mast_information_withholding": "sum",
-    "memory_growth": "sum",
-    "fact_writers": "sum",
-    "seats_without_memory": "sum",
-    "idle_seats": "sum",
-    "consolidation_backlog": "sum",
-    # ratios, times and scores
-    "success_rate": "mean",
-    "tool_use_accuracy": "mean",
-    "average_reward": "mean",
-    "pass_at_k": "mean",
-    "hallucination_rate": "mean",
-    "factual_grounding": "mean",
-    "context_retention": "mean",
-    "latency_avg": "mean",
-    "latency_p95": "mean",
-    "throughput": "mean",
-    "gate_retrieval_ratio": "mean",
-    "context_growth": "mean",
-    "handoff_latency": "mean",
-    "delegation_depth": "mean",
-    "delegation_breadth": "mean",
-    "mast_annotator_agreement": "mean",
-    "argument_confidence": "mean",
-    "cognitive_effort": "mean",
-    "cognitive_dissonance": "mean",
-    "empathy": "mean",
-    "preference_rate": "mean",
-    "sus": "mean",
-    "stance_convergence": "mean",
-    "stance_shift": "mean",
-    "semantic_diversity": "mean",
-    "bertscore": "mean",
-    "bleu_rouge_meteor": "mean",
-    "bench_code": "mean",
-    "bench_agentic": "mean",
-    "bench_general": "mean",
-    "bench_math": "mean",
-    "bench_domain": "mean",
-    "bench_multimodal": "mean",
-    "bench_task_selection": "mean",
+    # counters: the bucket's answer is how much it moved
+    "tokens_in": "delta",
+    "tokens_out": "delta",
+    "cost": "delta",
+    "cost_per_ring": "delta",
+    "tool_errors": "delta",
+    "step_repetition": "delta",
+    "premature_terminations": "delta",
+    "mandate_breaches": "delta",
+    "unanswered_handoffs": "delta",
+    "consultations": "delta",
+    "peer_pairs_used": "delta",
+    "mast_reasoning_action_mismatch": "delta",
+    "mast_information_withholding": "delta",
+    "memory_growth": "delta",
+    "fact_writers": "delta",
+    # levels and running means: the bucket's answer is where it ended up
+    "success_rate": "last",
+    "tool_use_accuracy": "last",
+    "average_reward": "last",
+    "pass_at_k": "last",
+    "hallucination_rate": "last",
+    "factual_grounding": "last",
+    "context_retention": "last",
+    "latency_avg": "last",
+    "latency_p95": "last",
+    "throughput": "last",
+    "gate_retrieval_ratio": "last",
+    "context_growth": "last",
+    "handoff_latency": "last",
+    "delegation_depth": "last",
+    "delegation_breadth": "last",
+    "seats_without_memory": "last",
+    "idle_seats": "last",
+    "consolidation_backlog": "last",
+    "mast_annotator_agreement": "last",
+    "argument_confidence": "last",
+    "cognitive_effort": "last",
+    "cognitive_dissonance": "last",
+    "empathy": "last",
+    "preference_rate": "last",
+    "sus": "last",
+    "stance_convergence": "last",
+    "stance_shift": "last",
+    "semantic_diversity": "last",
+    "bertscore": "last",
+    "bleu_rouge_meteor": "last",
+    "bench_code": "last",
+    "bench_agentic": "last",
+    "bench_general": "last",
+    "bench_math": "last",
+    "bench_domain": "last",
+    "bench_multimodal": "last",
+    "bench_task_selection": "last",
 }
 
 

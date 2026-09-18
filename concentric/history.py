@@ -212,16 +212,25 @@ def prune(conn: sqlite3.Connection, now: datetime | None = None) -> dict:
 # --- reading -----------------------------------------------------------------
 
 def series(metric: str, subject: str = "", granularity: str = "daily",
-           since: str | None = None, agg: str = "mean",
+           since: str | None = None, agg: str = "last",
            conn: sqlite3.Connection | None = None) -> dict:
     """One metric, one subject, bucketed.
 
     `agg` decides how a bucket is computed, and it comes from the registry rather
-    than from a guess here: counts sum, ratios and times take a weighted mean over
-    their own samples. Getting this wrong is the quietest way a trend chart lies.
+    than from a guess here:
+
+      delta  the metric only grows, so its reading is a running total over the
+             whole corpus and the bucket's answer is how much it moved. Summing
+             three readings of "15 repeats" gives 45, which describes nothing.
+      last   the metric is a level or a running mean, so its reading already is
+             the answer and the bucket takes the most recent one.
+
+    Both are computed from the readings inside the bucket, never across buckets.
     """
     if granularity not in BUCKETS:
         raise ValueError(f"granularity must be one of {', '.join(BUCKETS)}")
+    if agg not in ("delta", "last"):
+        raise ValueError("agg must be 'delta' or 'last'")
     own = conn is None
     conn = conn or connect()
     try:
@@ -231,25 +240,39 @@ def series(metric: str, subject: str = "", granularity: str = "daily",
         if since:
             where += " AND s.ts >= ?"
             params.append(since)
-        if agg == "sum":
-            expr = "SUM(r.value)"
+
+        if agg == "delta":
+            # MAX - MIN, which for a monotonic counter is last - first. NULL when
+            # the bucket holds a single reading: a change needs two, and reporting
+            # zero would say "nothing happened" about a period nobody watched.
+            # The first bucket therefore covers only what was recorded inside it,
+            # which is the honest answer — nothing was watching before that.
+            rows = conn.execute(
+                f"SELECT {bucket} AS bucket, "
+                f"  CASE WHEN COUNT(*) > 1 THEN MAX(r.value) - MIN(r.value) END AS value, "
+                f"  COUNT(*) - 1 AS n "
+                f"FROM readings r JOIN snapshots s ON s.id = r.snapshot "
+                f"{where} GROUP BY bucket ORDER BY bucket", params).fetchall()
         else:
-            # A weighted mean over the samples behind each reading. Falls back to
-            # a plain mean when a metric has no n, which is the only honest thing
-            # left to do rather than inventing a weight.
-            expr = ("CASE WHEN SUM(COALESCE(r.n, 0)) > 0 "
-                    "THEN SUM(r.value * r.n) / SUM(r.n) ELSE AVG(r.value) END")
-        rows = conn.execute(
-            f"SELECT {bucket} AS bucket, {expr} AS value, SUM(COALESCE(r.n,0)) AS n "
-            f"FROM readings r JOIN snapshots s ON s.id = r.snapshot "
-            f"{where} GROUP BY bucket ORDER BY bucket", params).fetchall()
-        points = [{"bucket": r["bucket"], "value": round(r["value"], 6) if r["value"] is not None else None,
+            # The most recent reading in each bucket. A window function rather
+            # than a correlated subquery, because snapshots are ordered by id and
+            # id order is time order.
+            rows = conn.execute(
+                f"SELECT bucket, value, n FROM ("
+                f"  SELECT {bucket} AS bucket, r.value AS value, r.n AS n,"
+                f"         ROW_NUMBER() OVER (PARTITION BY {bucket} ORDER BY s.id DESC) AS rn"
+                f"  FROM readings r JOIN snapshots s ON s.id = r.snapshot"
+                f"  {where}) WHERE rn = 1 ORDER BY bucket", params).fetchall()
+
+        points = [{"bucket": r["bucket"],
+                   "value": round(r["value"], 6) if r["value"] is not None else None,
                    "n": r["n"]} for r in rows]
         values = [p["value"] for p in points if p["value"] is not None]
         baseline = None
         if len(values) >= 3:
-            values.sort()
-            baseline = {"lo": values[len(values) // 10], "hi": values[-max(1, len(values) // 10)]}
+            ordered = sorted(values)
+            baseline = {"lo": ordered[len(ordered) // 10],
+                        "hi": ordered[-max(1, len(ordered) // 10)]}
         return {"metric": metric, "subject": subject, "granularity": granularity,
                 "agg": agg, "points": points, "baseline": baseline}
     finally:
@@ -312,7 +335,7 @@ def main() -> None:
         return
 
     result = series(args.metric, args.subject, args.granularity, args.since,
-                    metrics.AGG.get(args.metric, "mean"), conn)
+                    metrics.AGG.get(args.metric, "last"), conn)
     if args.json:
         print(json.dumps(result, indent=2))
         return
