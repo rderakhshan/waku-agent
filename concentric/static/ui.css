@@ -727,3 +727,18 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
   color:var(--text-faint)}
 .lab-row-filler{font-size:var(--text-xs);color:var(--text-faint);
   margin-top:3px;line-height:var(--leading-snug)}
+
+/* ---- the run button.
+   The only control here that spends money, so it states the cost before the
+   click and shows progress after it. The bar is a plain line of text rather than
+   a progress element: the run is a sequence of model calls, not a percentage,
+   and a number that goes 34 of 80 is more honest than a bar that guesses. */
+.lab-batch{display:flex;align-items:flex-start;gap:var(--space-4);
+  padding:var(--space-3) 0 var(--space-4);border-bottom:var(--rule-width) solid var(--rule);
+  margin-bottom:var(--space-4);flex-wrap:wrap}
+.lab-batch-txt{flex:1;min-width:280px;font-size:var(--text-sm);color:var(--text-faint);
+  line-height:var(--leading-snug)}
+.lab-run{flex-shrink:0}
+.lab-progress{flex-basis:100%;font-family:var(--face-mono);font-size:var(--text-xs);
+  color:var(--text-ink);margin-top:var(--space-2)}
+.lab-row-asof{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-faint)}

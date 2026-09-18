@@ -64,6 +64,98 @@
     return uiBadge("planned", "neutral");
   }
 
+  // ---- the run button.
+  //
+  // The only control on this page that spends money. Three rules, all of them
+  // about the reader being able to decide rather than discover:
+  //
+  //   * it says what the run will cost before it is pressed
+  //   * it refuses to start a second run while one is going
+  //   * it refreshes the view the moment the numbers land, rather than leaving
+  //     the reader waiting up to five seconds for the next poll
+  //
+  // Nothing here runs on a timer. The batch is a decision, not a background job.
+
+  let batchRunning = false;
+  let batchText = "";
+
+  function ago(iso) {
+    if (!iso) return "never";
+    const then = Date.parse(iso);
+    if (isNaN(then)) return "unknown";
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins} min ago`;
+    const hours = Math.round(mins / 60);
+    return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
+  }
+
+  function batchBar(d) {
+    const b = d.batch || {};
+    const limit = b.limit || 20;
+    const cost = b.calls ? `${b.calls} model calls` : "an unknown number of calls";
+    const note = b.embeddings ? ""
+      : " The four semantic metrics stay empty: no OPENAI_API_KEY is set.";
+    return `<div class="lab-batch">
+      <div class="lab-batch-txt"><b>Last batch run:</b> ${esc(ago(b.last_run))}.
+        The next one scores the last ${esc(limit)} turns for ${esc(cost)}.${note}</div>
+      <button type="button" class="btn btn-primary lab-run" id="lab-run">Run the batch</button>
+      <div class="lab-progress" id="lab-progress" hidden></div>
+    </div>`;
+  }
+
+  function wireBatch() {
+    const btn = document.getElementById("lab-run");
+    if (!btn) return;
+    const bar = document.getElementById("lab-progress");
+    // The view is rebuilt on every poll, so a run in flight has to be restored
+    // rather than forgotten: the button comes back enabled otherwise, and a
+    // second press would be refused by the server after the click.
+    if (batchRunning) {
+      btn.disabled = true;
+      if (bar) { bar.hidden = false; bar.textContent = batchText; }
+    }
+    btn.addEventListener("click", async () => {
+      if (batchRunning) return;
+      batchRunning = true;
+      batchText = "starting…";
+      btn.disabled = true;
+      if (bar) { bar.hidden = false; bar.textContent = batchText; }
+      try {
+        const res = await fetch("/api/metrics/run", { method: "POST" });
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        for (;;) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          buf += dec.decode(chunk.value, { stream: true });
+          const parts = buf.split("\n\n");
+          buf = parts.pop();
+          for (const part of parts) {
+            const line = part.replace(/^data: /, "").trim();
+            if (!line) continue;
+            let ev;
+            try { ev = JSON.parse(line); } catch (e) { continue; }
+            if (ev.kind === "start") batchText = `running · 0 of ${ev.calls}`;
+            else if (ev.kind === "progress") batchText = `running · ${ev.done} of ${ev.of}`;
+            else if (ev.kind === "error") batchText = `stopped: ${ev.message}`;
+            else if (ev.kind === "done") batchText = `done · ${ev.scored} turns scored`;
+            if (bar) bar.textContent = batchText;
+          }
+        }
+      } catch (e) {
+        batchText = `the run failed: ${e}`;
+        if (bar) { bar.hidden = false; bar.textContent = batchText; }
+      }
+      batchRunning = false;
+      btn.disabled = false;
+      // main.js's own refresh, so the new report shows up now rather than at the
+      // next poll.
+      if (typeof refresh === "function") refresh();
+    });
+  }
+
   function verdict(m, d) {
     const turns = (d.stats && d.stats.turns) || 0;
     const val = (id) => (m[id] && m[id].value !== null) ? m[id].value : null;
@@ -109,7 +201,8 @@
           ${stateBadge(s)}
         </div>
         <div class="lab-row-value"><code>${esc(show(s.value))}</code>
-          <span class="lab-row-unit">${esc(s.unit)}</span></div>
+          <span class="lab-row-unit">${esc(s.unit)}</span>
+          ${s.as_of ? `<span class="lab-row-asof">run ${esc(ago(s.as_of))}</span>` : ""}</div>
         ${s.value === null && s.filler
           ? `<div class="lab-row-filler">${esc(s.filler)}</div>` : ""}
       </div>`).join("");
@@ -128,7 +221,8 @@
     return groups.filter(([, g]) => g.length).map(([title, group]) => {
       const body = group.map((s) => [
         `<code>${esc(s.id)}</code><div class="meta">${esc(s.label)}</div>`,
-        `<code>${esc(show(s.value))}</code>`,
+        `<code>${esc(show(s.value))}</code>`
+          + (s.as_of ? `<div class="meta">run ${esc(ago(s.as_of))}</div>` : ""),
         stateBadge(s),
         `<span class="meta">${esc(s.unit)} · ${esc(s.changes)} · `
         + `${esc(s.source)}</span>`,
@@ -164,7 +258,10 @@
       { label: "blocked",
         value: String(rows.filter((s) => s.value === null && s.state === "blocked").length) },
     ]);
-    return head + verdict(m, d) + band
+    // After the DOM swaps in: the button's listener, and a run in flight
+    // restored. The same deferred wiring department.js does for its own view.
+    setTimeout(wireBatch, 0);
+    return head + verdict(m, d) + batchBar(d) + band
       + attention(m, rows)
       + `<h2>The lenses</h2>`
       + `<div class="lab-grid">${LENSES.map((l) => lensCard(l, m)).join("")}</div>`

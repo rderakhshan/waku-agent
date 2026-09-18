@@ -244,4 +244,26 @@ def collect_department() -> dict:
         "chat_pending": data.get("chat_pending"),
         "eval_report": data.get("eval_report"),
     })
+    # What the Lab's run button needs to state its cost before anyone presses it,
+    # and how old the last set of judge numbers is.
+    last_run = None
+    for mid in metrics.JUDGE_METRICS:
+        slot = data["metrics"].get(mid) or {}
+        if slot.get("as_of"):
+            last_run = slot["as_of"]
+            break
+    data["batch"] = {
+        "limit": metrics.BATCH_LIMIT,
+        "calls": metrics.estimate_calls(events, metrics.BATCH_LIMIT),
+        "last_run": last_run,
+        "embeddings": _embeddings_available(),
+    }
     return data
+
+
+def _embeddings_available() -> bool:
+    """Whether a batch run could embed, so the button can say what it will and
+    will not fill before it is pressed."""
+    from concentric import embeddings
+
+    return embeddings.available()

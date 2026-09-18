@@ -35,6 +35,11 @@ from collections import Counter
 from datetime import datetime
 from typing import Any
 
+# How many turns a batch run scores. The limit bounds every pass, so this is also
+# what the button's cost estimate is built from. It sits up here because `run()`
+# uses it as a default, and a default is evaluated when the function is defined.
+BATCH_LIMIT = 20
+
 # --- the slots ---------------------------------------------------------------
 #
 # state      computed    the value is here now
@@ -259,7 +264,8 @@ SLOTS: tuple[dict[str, Any], ...] = (
 
 def registry() -> dict[str, dict]:
     """A fresh copy of the slots, keyed by id."""
-    return {slot["id"]: {**slot, "value": None, "cost_ms": None} for slot in SLOTS}
+    return {slot["id"]: {**slot, "value": None, "cost_ms": None, "as_of": None}
+            for slot in SLOTS}
 
 
 # --- reading the trace -------------------------------------------------------
@@ -850,7 +856,7 @@ Reply with ONLY this JSON, no prose:
 """
 
 
-def _grounding_values(turns: list[list[dict]]) -> dict:
+def _grounding_values(turns: list[list[dict]], tick=None) -> dict:
     """Hallucination rate and factual grounding: one question, scored two ways.
 
     Both read the trace and nothing else. The tools block is what the agent
@@ -874,6 +880,8 @@ def _grounding_values(turns: list[list[dict]]) -> dict:
         verdict = _judge_json(GROUNDING
                               + "TOOLS:\n" + "\n".join(tools)[:4000]
                               + "\n\nREPLY:\n" + reply[:2000])
+        if tick:
+            tick()
         if verdict is None or "grounded" not in verdict:
             continue
         scored += 1
@@ -918,7 +926,7 @@ def kappa(a: list[int], b: list[int]) -> float | None:
     return round((observed - expected) / (1 - expected), 4)
 
 
-def _agreement_values(events: list[dict], sample: list[list[dict]]) -> dict:
+def _agreement_values(events: list[dict], sample: list[list[dict]], tick=None) -> dict:
     """How much two labelings of the same traces agree.
 
     The two prompts differ in framing, not in question, so what kappa measures
@@ -930,6 +938,9 @@ def _agreement_values(events: list[dict], sample: list[list[dict]]) -> dict:
         digest = _digest(turn)
         va = _judge_json(AGREEMENT_A + digest)
         vb = _judge_json(AGREEMENT_B + digest)
+        if tick:
+            tick()
+            tick()
         if va is None or vb is None:
             continue
         if "reasoning_action_mismatch" not in va or "reasoning_action_mismatch" not in vb:
@@ -966,15 +977,30 @@ TURN:
 """
 
 
-def run(limit: int = 20) -> dict:
+def run(limit: int = BATCH_LIMIT, on_progress=None) -> dict:
     """Score the most recent `limit` turns and write the report.
 
     The limit bounds every pass. This is the only function here that spends
-    money, and it never runs from the dashboard.
+    money, and it never runs on its own — the launcher's button is the only
+    caller, and `estimate_calls` tells the reader what it will cost before
+    anybody presses it.
+
+    `on_progress(done, total)` is called after every model call so a run that
+    takes minutes is not a blank screen.
     """
     ctx = context()
-    turns = [t for t in _turns_of(ctx.get("events") or []) if len(t) > 1]
+    events = ctx.get("events") or []
+    turns = [t for t in _turns_of(events) if len(t) > 1]
     sample = turns[-limit:]
+    total = estimate_calls(events, limit)
+    done = 0
+
+    def tick():
+        nonlocal done
+        done += 1
+        if on_progress:
+            on_progress(done, total)
+
     hits = {"mast_reasoning_action_mismatch": 0, "mast_information_withholding": 0}
     rewards = []
     errors = []
@@ -986,6 +1012,8 @@ def run(limit: int = 20) -> dict:
         except (ValueError, json.JSONDecodeError, OSError) as exc:
             errors.append(str(exc)[:120])
             continue
+        finally:
+            tick()
         for key in hits:
             hits[key] += 1 if verdict.get(key) else 0
         if isinstance(verdict.get("reward"), (int, float)):
@@ -995,9 +1023,8 @@ def run(limit: int = 20) -> dict:
     values["average_reward"] = round(sum(rewards) / len(rewards), 4) if rewards else None
     # The semantic and reference metrics need the same turn data, so they ride
     # the same run rather than each paying for their own pass over the corpus.
-    events = ctx.get("events") or []
-    values.update(_grounding_values(sample))
-    values.update(_agreement_values(events, sample))
+    values.update(_grounding_values(sample, tick))
+    values.update(_agreement_values(events, sample, tick))
     values.update(_semantic_values(events))
     values.update(_reference_values(events))
 
@@ -1015,12 +1042,19 @@ def run(limit: int = 20) -> dict:
 def apply_report(reg: dict[str, dict], report: dict) -> int:
     """Merge a report into the registry. Only ids in JUDGE_METRICS are accepted,
     and only when the value is present — a null in the report leaves the slot
-    None rather than writing a zero."""
+    None rather than writing a zero.
+
+    A judge number also carries the moment it was produced. Without it a reading
+    from three hours ago and a counter computed on this poll look identical, and
+    they are not the same kind of fact.
+    """
     values = (report or {}).get("values") or {}
+    ran_at = (report or {}).get("ran_at")
     applied = 0
     for mid in JUDGE_METRICS:
         if mid in reg and isinstance(values.get(mid), (int, float)):
             reg[mid]["value"] = values[mid]
+            reg[mid]["as_of"] = ran_at
             applied += 1
     return applied
 
@@ -1035,6 +1069,22 @@ def apply_report(reg: dict[str, dict], report: dict) -> int:
 # pass@k's k. Two is the smallest repeat that can distinguish "it worked" from
 # "it worked once" — the taxonomy's whole point in asking for k at all.
 PASS_K = 2
+
+
+def estimate_calls(events: list[dict], limit: int = BATCH_LIMIT) -> int:
+    """How many model calls a run of this size will make.
+
+    The button says this before anyone presses it. Spending money is a decision,
+    and a decision needs a number — the alternative is finding out from the bill.
+    """
+    turns = [t for t in _turns_of(events) if len(t) > 1]
+    sample = turns[-limit:]
+    groundable = [t for t in sample
+                  if any(e.get("type") == "tool" and e.get("output") for e in t)
+                  and any(e.get("type") == "turn_end" and (e.get("reply") or "").strip()
+                          for e in t)]
+    # rubric + grounding + two agreement labelings, per turn
+    return len(sample) + len(groundable) + 2 * len(sample)
 
 
 def tool_report_path(ensure: bool = True):

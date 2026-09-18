@@ -17,7 +17,7 @@ from __future__ import annotations
 from concentric import metrics
 
 REQUIRED = ("id", "label", "state", "kind", "changes", "unit", "direction",
-            "source", "filler", "value", "cost_ms")
+            "source", "filler", "value", "cost_ms", "as_of")
 STATES = {"computed", "ready", "blocked", "placeholder"}
 
 # One turn with a delegate that was never answered, one repeated tool call, and
@@ -340,3 +340,41 @@ def test_pass_at_k_counts_a_capability_that_is_reachable():
 def test_pass_at_k_needs_a_case_run_more_than_once():
     assert metrics._pass_at_k(_raced_case("schedule-basic", [True]), k=2) is None
     assert metrics._pass_at_k([], k=2) is None
+
+
+# --- the batch run: progress and the estimate, with no money spent -----------
+
+JUDGE_REPLY = ('{"grounded": 1, "reward": 0.5, "reasoning_action_mismatch": 0, '
+               '"information_withholding": 0}')
+
+
+def test_a_run_reports_progress_and_the_estimate_is_the_truth(monkeypatch, tmp_path):
+    """The button states a call count before anyone presses it. That number has
+    to be what the run actually does, and progress has to reach the end — a bar
+    that stops at 60 of 75 is worse than no bar.
+
+    Every judge call is stubbed, so this costs nothing.
+    """
+    from pathlib import Path
+
+    monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700: JUDGE_REPLY)
+    monkeypatch.setattr(metrics, "context", lambda: CTX)
+    monkeypatch.setattr(metrics, "report_path", lambda: Path(tmp_path) / "report.json")
+    monkeypatch.setattr(metrics, "references_path", lambda: Path(tmp_path) / "none.jsonl")
+
+    seen = []
+    record = metrics.run(limit=2, on_progress=lambda done, total: seen.append((done, total)))
+
+    assert record["scored"] == 2, "the rubric pass did not score both sampled turns"
+    assert seen, "progress was never reported"
+    assert seen[-1][0] == seen[-1][1], f"progress stopped at {seen[-1]}"
+    assert seen[-1][1] == metrics.estimate_calls(CTX["events"], 2), (
+        "the estimate the button shows is not the number of calls the run makes")
+
+
+def test_the_estimate_bounds_every_pass(monkeypatch):
+    """Three passes, three counts, and none of them may exceed the limit."""
+    turns = [t for t in metrics._turns_of(_grounding_events())]
+    assert len(turns) == 2
+    # two turns, both groundable: 2 rubric + 2 grounding + 4 agreement = 8
+    assert metrics.estimate_calls(_grounding_events(), 2) == 8

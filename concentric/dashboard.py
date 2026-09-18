@@ -23,6 +23,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import threading
 from pathlib import Path
 
 from concentric import MODEL, PROVIDER, SMALL_MODEL, seat_home
@@ -269,6 +270,10 @@ def _inject(html: str) -> str:
 # here covers this launcher's route and waku's, without editing waku.
 ABORTED = (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)
 
+# One batch at a time. Two tabs pressing the button would otherwise start two
+# runs, and the reader would pay for both without seeing either finish.
+_batch_lock = threading.Lock()
+
 
 def _handler_class():
     """waku's request handler, plus three routes for the department view.
@@ -332,6 +337,58 @@ def _handler_class():
                 super().do_GET()
             except ABORTED:
                 pass
+
+        def do_POST(self):  # noqa: N802 — BaseHTTPRequestHandler's name
+            """The Lab's run button. Everything else falls through to waku.
+
+            Server-sent events rather than one blocking request, because a batch
+            takes minutes: a plain POST would time out and the reader would watch
+            a spinner with nothing behind it. This mirrors /api/compare/stream,
+            which is the arena's version of the same idea.
+            """
+            if self.path.split("?", 1)[0] != "/api/metrics/run":
+                try:
+                    super().do_POST()
+                except ABORTED:
+                    pass
+                return
+
+            length = int(self.headers.get("Content-Length") or 0)
+            if length:
+                self.rfile.read(length)
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+
+            def emit(kind: str, payload: dict) -> None:
+                try:
+                    line = json.dumps({"kind": kind, **payload}, default=str)
+                    self.wfile.write(f"data: {line}\n\n".encode())
+                    self.wfile.flush()
+                except ABORTED:
+                    pass  # the reader navigated away mid-run — the run finishes
+
+            if not _batch_lock.acquire(blocking=False):
+                emit("error", {"message": "a batch is already running"})
+                return
+            try:
+                from concentric import metrics
+
+                emit("start", {"limit": metrics.BATCH_LIMIT,
+                               "calls": metrics.estimate_calls(
+                                   metrics.context().get("events") or [])})
+                record = metrics.run(
+                    limit=metrics.BATCH_LIMIT,
+                    on_progress=lambda done, total: emit(
+                        "progress", {"done": done, "of": total}))
+                emit("done", {"ran_at": record["ran_at"],
+                              "scored": record["scored"],
+                              "values": record["values"]})
+            except Exception as exc:  # noqa: BLE001 — surface it, never 500
+                emit("error", {"message": f"{type(exc).__name__}: {exc}"})
+            finally:
+                _batch_lock.release()
 
     return DepartmentHandler
 
