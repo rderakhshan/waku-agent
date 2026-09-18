@@ -1018,59 +1018,103 @@ def _withholding(turns: list[list[dict]], tick=None) -> int | None:
     return hits if scored else None
 
 
+def _turn_ts(turn: list[dict]) -> str:
+    return next((e.get("ts") for e in turn if e.get("type") == "turn_start"), "") or ""
+
+
+def _after(ts: str, since: str | None) -> bool:
+    """Is this turn newer than the bookmark?
+
+    Parsed rather than compared as strings. The trace stamps carry microseconds
+    and the bookmark is written to the second, and `.` sorts below `+` — so a
+    string comparison would call a turn at 10.000 older than one at 10.000+00:00.
+    It happens to work today and would stop working the first time a format
+    changed.
+    """
+    if not since:
+        return True
+    now, mark = _parse(ts), _parse(since)
+    return True if now is None or mark is None else now > mark
+
+
+def unscored(events: list[dict], since: str | None) -> list[list[dict]]:
+    """The turns the batch has not scored yet, oldest first."""
+    return [t for t in _turns_of(events) if len(t) > 1 and _after(_turn_ts(t), since)]
+
+
 def run(limit: int = BATCH_LIMIT, on_progress=None) -> dict:
-    """Score the most recent `limit` turns and write the report.
+    """Score the turns that have not been scored, and write them down.
+
+    **Only the new ones.** A bookmark in the history records the timestamp of the
+    last turn scored, so pressing the button twice scores the second press's
+    turns and nothing else. Without it, every press would re-score the same
+    conversations and pay for them again.
 
     The limit bounds every pass. This is the only function here that spends
     money, and it never runs on its own — the launcher's button is the only
-    caller, and `estimate_calls` tells the reader what it will cost before
-    anybody presses it.
-
-    Everything it produces is keyed by the seat or the pair it is about. The
-    turn-level versions asked "was the department's reply good", which is a
-    question about nobody in particular.
+    caller, and `estimate_calls` tells the reader what it will cost first.
     """
+    from concentric import history
+
     ctx = context()
     events = ctx.get("events") or []
-    turns = [t for t in _turns_of(events) if len(t) > 1]
-    sample = turns[-limit:]
-    total = estimate_calls(events, limit)
-    done = 0
+    conn = history.connect()
+    try:
+        since = history.get_mark(conn, "last_scored_ts")
+        fresh = unscored(events, since)
+        sample = fresh[-limit:]
+        total = estimate_calls(events, limit, since)
+        done = 0
 
-    def tick():
-        nonlocal done
-        done += 1
-        if on_progress:
-            on_progress(done, total)
+        def tick():
+            nonlocal done
+            done += 1
+            if on_progress:
+                on_progress(done, total)
 
-    values: dict[str, Any] = {}
-    scored_answers = 0
+        values: dict[str, Any] = {}
+        scored_answers = 0
 
-    scored = _scored_answers(sample, tick)
-    if scored["average_reward"]:
-        values["average_reward"] = scored["average_reward"]
-        scored_answers = sum(cell["n"] for cell in scored["average_reward"].values())
-    if scored["mast_reasoning_action_mismatch"]:
-        values["mast_reasoning_action_mismatch"] = scored["mast_reasoning_action_mismatch"]
-    values.update(_grounding_by_seat(sample, tick))
+        scored = _scored_answers(sample, tick)
+        if scored["average_reward"]:
+            values["average_reward"] = scored["average_reward"]
+            scored_answers = sum(cell["n"] for cell in scored["average_reward"].values())
+        if scored["mast_reasoning_action_mismatch"]:
+            values["mast_reasoning_action_mismatch"] = scored["mast_reasoning_action_mismatch"]
+        values.update(_grounding_by_seat(sample, tick))
 
-    withholding = _withholding(sample, tick)
-    if withholding is not None:
-        values["mast_information_withholding"] = withholding
+        withholding = _withholding(sample, tick)
+        if withholding is not None:
+            values["mast_information_withholding"] = withholding
 
-    values.update(_agreement_values(events, sample, tick))
-    values.update(_semantic_values(events))
-    values.update(_reference_values(events))
+        values.update(_agreement_values(events, sample, tick))
+        values.update(_semantic_values(events))
+        values.update(_reference_values(events))
 
-    record = {
-        "ran_at": datetime.now().astimezone().isoformat(timespec="seconds"),
-        "scored": scored_answers,
-        "of_turns": len(sample),
-        "values": values,
-        "errors": [],
-    }
-    report_path().write_text(json.dumps(record, indent=2), encoding="utf-8")
-    return record
+        record = {
+            "ran_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "scored": scored_answers,
+            "of_turns": len(sample),
+            "values": values,
+            "errors": [],
+        }
+        report_path().write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+        # Write the reading into the history, then move the bookmark. The order
+        # matters: a bookmark that moved before the write would skip a turn that
+        # was never recorded, and it would never be scored again.
+        registry = compute(ctx)
+        for mid, value in values.items():
+            if mid in registry:
+                registry[mid]["value"] = value
+                registry[mid]["as_of"] = record["ran_at"]
+        history.record(registry, AGG, reason="batch", turns=len(sample), conn=conn)
+        newest = max((_turn_ts(t) for t in sample), default="")
+        if newest:
+            history.set_mark(conn, "last_scored_ts", newest)
+        return record
+    finally:
+        conn.close()
 
 
 def apply_report(reg: dict[str, dict], report: dict) -> int:
@@ -1521,13 +1565,18 @@ def _grounding_by_seat(turns: list[list[dict]], tick=None) -> dict:
 
 
 
-def estimate_calls(events: list[dict], limit: int = BATCH_LIMIT) -> int:
+def estimate_calls(events: list[dict], limit: int = BATCH_LIMIT,
+                   since: str | None = None) -> int:
     """How many model calls a run of this size will make.
 
     The button says this before anyone presses it. Spending money is a decision,
     and a decision needs a number — the alternative is finding out from the bill.
+
+    `since` is the bookmark: with it, the estimate is for the turns that have not
+    been scored rather than for the last twenty of the corpus. Without it the
+    button would quote a price for work that has already been paid for.
     """
-    turns = [t for t in _turns_of(events) if len(t) > 1][-limit:]
+    turns = unscored(events, since)[-limit:]
     answers = _answers(turns)
     per_answer = sum(len(v) for v in answers.values())
     with_tools = sum(1 for v in answers.values() for a in v if a["tools"])

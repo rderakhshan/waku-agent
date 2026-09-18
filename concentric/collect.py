@@ -252,9 +252,23 @@ def collect_department() -> dict:
         if slot.get("as_of"):
             last_run = slot["as_of"]
             break
+    # The bookmark, so the button quotes the price of the turns that have NOT
+    # been scored rather than of the last twenty of the corpus. Without it a
+    # reader would be told to pay again for work already done.
+    from concentric import history
+
+    conn = history.connect()
+    try:
+        since = history.get_mark(conn, "last_scored_ts")
+        snapshot_ts = history.get_mark(conn, "last_snapshot_ts")
+    finally:
+        conn.close()
     data["batch"] = {
         "limit": metrics.BATCH_LIMIT,
-        "calls": metrics.estimate_calls(events, metrics.BATCH_LIMIT),
+        "calls": metrics.estimate_calls(events, metrics.BATCH_LIMIT, since),
+        "unscored": len(metrics.unscored(events, since)),
+        "last_scored": since,
+        "last_snapshot": snapshot_ts,
         "last_run": last_run,
         "embeddings": _embeddings_available(),
     }

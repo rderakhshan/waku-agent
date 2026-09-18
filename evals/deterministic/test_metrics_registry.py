@@ -458,6 +458,11 @@ def test_a_run_reports_progress_and_the_estimate_is_the_truth(monkeypatch, tmp_p
     monkeypatch.setattr(metrics, "context", lambda: CTX)
     monkeypatch.setattr(metrics, "report_path", lambda: Path(tmp_path) / "report.json")
     monkeypatch.setattr(metrics, "references_path", lambda: Path(tmp_path) / "none.jsonl")
+    # run() writes its reading into the history now, so the store needs a home
+    # that is not the reader's.
+    from concentric import history
+
+    monkeypatch.setattr(history, "db_path", lambda: Path(tmp_path) / "metrics.db")
 
     seen = []
     record = metrics.run(limit=2, on_progress=lambda done, total: seen.append((done, total)))

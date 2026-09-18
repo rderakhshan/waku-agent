@@ -221,3 +221,56 @@ CTX_EVENTS = [
      "ts": "2026-01-01T00:01:01+00:00"},
     {"type": "turn_end", "reply": "a2", "ts": "2026-01-01T00:01:02+00:00"},
 ]
+
+
+# --- the bookmark: never score a turn twice --------------------------------
+
+def test_only_unscored_turns_are_picked_up():
+    """The whole reason the bookmark exists. Without it every press would
+    re-score the same conversations and pay for them again."""
+    assert len(metrics.unscored(CTX_EVENTS, None)) == 2
+    assert len(metrics.unscored(CTX_EVENTS, "2026-01-01T00:00:30+00:00")) == 1
+    assert metrics.unscored(CTX_EVENTS, "2026-01-01T00:02:00+00:00") == []
+
+
+def test_the_bookmark_is_compared_as_a_time_not_as_a_string():
+    """The trace stamps carry microseconds and the bookmark is written to the
+    second. `.` sorts below `+`, so a string comparison would call a turn at
+    10.000 older than one at 10+00:00 — which is the same moment."""
+    assert metrics._after("2026-01-01T00:00:10.500+00:00", "2026-01-01T00:00:10+00:00")
+    assert not metrics._after("2026-01-01T00:00:09.999+00:00", "2026-01-01T00:00:10+00:00")
+
+
+def test_the_estimate_only_counts_the_new_turns():
+    """The button quotes the price of the work it will actually do. Without the
+    bookmark it would quote a price for turns already paid for."""
+    everything = metrics.estimate_calls(CTX_EVENTS, 20, None)
+    nothing_new = metrics.estimate_calls(CTX_EVENTS, 20, "2026-01-01T00:02:00+00:00")
+    assert everything > 0
+    assert nothing_new == 0
+
+
+def test_a_run_moves_the_bookmark_and_records_its_reading(monkeypatch, tmp_path):
+    from pathlib import Path
+
+    monkeypatch.setattr(metrics, "context", lambda: {"events": CTX_EVENTS})
+    monkeypatch.setattr(metrics, "report_path", lambda: Path(tmp_path) / "report.json")
+    monkeypatch.setattr(metrics, "references_path", lambda: Path(tmp_path) / "none.jsonl")
+    monkeypatch.setattr(history, "db_path", lambda: Path(tmp_path) / "metrics.db")
+    monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700:
+                        '{"grounded": 1, "reward": 0.5, "reasoning_action_mismatch": 0, '
+                        '"information_withholding": 0}')
+
+    metrics.run(limit=20)
+    conn = history.connect(tmp_path / "metrics.db")
+    try:
+        assert history.get_mark(conn, "last_scored_ts") == "2026-01-01T00:01:00+00:00"
+        reasons = [r["reason"] for r in conn.execute("SELECT reason FROM snapshots")]
+        assert reasons == ["batch"]
+    finally:
+        conn.close()
+
+    # and the second press has nothing to do
+    assert metrics.estimate_calls(CTX_EVENTS, 20,
+                                  history.get_mark(history.connect(tmp_path / "metrics.db"),
+                                                   "last_scored_ts")) == 0
