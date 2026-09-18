@@ -285,39 +285,62 @@ def _handler_class():
     from waku.ops import dashboard as wd
 
     class DepartmentHandler(wd.Handler):
+        def _frontend(self, body: bytes, ctype: str) -> None:
+            """Send a file that must never be cached.
+
+            waku's `_send(no_cache=True)` sets `no-cache, must-revalidate` — and
+            no ETag and no Last-Modified. A cache with nothing to revalidate
+            against has no way to check, so a browser may keep serving the copy
+            it holds and an edited file looks unchanged after an ordinary reload.
+            That has cost this project several rounds of "the change is not
+            there" when the change was on disk the whole time.
+
+            `no-store` removes the decision rather than asking for it: the file
+            is fetched every time, and a hard reload stops being load-bearing.
+            """
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store, must-revalidate")
+            self.end_headers()
+            try:
+                self.wfile.write(body)
+            except ABORTED:
+                pass
+
         def do_GET(self):  # noqa: N802 — BaseHTTPRequestHandler's name
             path = self.path.split("?", 1)[0]
             if path == "/department.js":
                 body = (Path(__file__).parent / "static" / "department.js").read_bytes()
-                self._send(body, "text/javascript", no_cache=True)
+                self._frontend(body, "text/javascript")
                 return
             if path == "/home.js":
                 body = (Path(__file__).parent / "static" / "home.js").read_bytes()
-                self._send(body, "text/javascript", no_cache=True)
+                self._frontend(body, "text/javascript")
                 return
             if path == "/observation.js":
                 body = (Path(__file__).parent / "static" / "observation.js").read_bytes()
-                self._send(body, "text/javascript", no_cache=True)
+                self._frontend(body, "text/javascript")
                 return
             if path == "/irina-mark.svg":
                 body = (Path(__file__).parent / "static" / "irina-mark.svg").read_bytes()
-                self._send(body, "image/svg+xml", no_cache=True)
+                self._frontend(body, "image/svg+xml")
                 return
             if path == "/ui.css":
                 body = (Path(__file__).parent / "static" / "ui.css").read_bytes()
-                self._send(body, "text/css", no_cache=True)
+                self._frontend(body, "text/css")
                 return
             if path == "/themes.css":
                 body = (Path(__file__).parent / "static" / "themes.css").read_bytes()
-                self._send(body, "text/css", no_cache=True)
+                self._frontend(body, "text/css")
                 return
             if path == "/theme.js":
                 body = (Path(__file__).parent / "static" / "theme.js").read_bytes()
-                self._send(body, "text/javascript", no_cache=True)
+                self._frontend(body, "text/javascript")
                 return
             if path == "/layout.js":
                 body = (Path(__file__).parent / "static" / "layout.js").read_bytes()
-                self._send(body, "text/javascript", no_cache=True)
+                self._frontend(body, "text/javascript")
                 return
             if path == "/":
                 html = (wd.STATIC / "index.html").read_text(encoding="utf-8")
