@@ -140,22 +140,46 @@ def test_compute_survives_an_empty_world():
 
 def test_the_trace_metrics_read_the_trace():
     """The deterministic half: these are pattern matches over the events above,
-    and each one has a hand-checkable answer."""
+    and each one has a hand-checkable answer.
+
+    They come back keyed by seat now, because that is what the taxonomy asks —
+    "which agent repeated a step", not "how many repeats were there".
+    """
     reg = metrics.compute(CTX)
-    assert reg["step_repetition"]["value"] == 1          # save_note fired twice
-    assert reg["unanswered_handoffs"]["value"] == 1      # cfo-1 never answered
-    assert reg["premature_terminations"]["value"] == 1   # the second turn never ended
-    assert reg["delegation_breadth"]["value"] == 1       # one distinct target
-    assert reg["mandate_breaches"]["value"] == 0         # nobody used a foreign tool
+    assert reg["step_repetition"]["value"]["irina"]["value"] == 1  # save_note twice
+    assert reg["unanswered_handoffs"]["value"] == 1                # cfo-1 never answered
+    assert reg["mandate_breaches"]["value"]["irina"]["value"] == 0  # no foreign tool
+    assert reg["tool_errors"]["value"]["irina"]["value"] == 0
+
+
+def test_a_seat_metric_carries_the_sample_it_was_drawn_from():
+    """A mean over two turns and a mean over forty are not the same claim. The
+    page shows n beside every per-seat number, so it has to be there."""
+    reg = metrics.compute(CTX)
+    for mid in ("latency_avg", "step_repetition", "tokens_in", "cost"):
+        for seat, cell in reg[mid]["value"].items():
+            assert isinstance(cell, dict), f"{mid}[{seat}] is not a cell"
+            assert "value" in cell and "n" in cell, f"{mid}[{seat}] has no n"
+            assert cell["n"] >= 1
+
+
+def test_premature_terminations_are_attributed_to_a_seat():
+    """turn_end carries no role, so this is an inference — but a named seat is
+    worth more than a department count that blames nobody."""
+    value = metrics.compute(CTX)["premature_terminations"]["value"]
+    assert value == {"irina": {"value": 1, "n": 1}}, value
 
 
 def test_the_throughput_is_the_inverse_of_active_time():
     """A turn runs to its LAST llm call, which is waku's own definition. So turn
     one is 2s (00:00:00 to its llm at 00:00:02) and turn two is 1s: two turns of
     work in three seconds, forty a minute. The wall-clock span would have said
-    0.003, which is why it is computed this way."""
+    0.003, which is why it is computed this way.
+
+    Per seat now, so the answer is irina's rather than the department's."""
     value = metrics.compute(CTX)["throughput"]["value"]
-    assert value is not None and 39 < value < 41, value
+    assert value["irina"]["value"] == 40.0, value
+    assert value["irina"]["n"] == 2
 
 
 # --- the batch report --------------------------------------------------------
@@ -177,14 +201,15 @@ def test_a_report_fills_only_the_slots_it_is_allowed_to():
     assert reg["average_reward"]["value"] == 0.72
     assert reg["mast_reasoning_action_mismatch"]["value"] == 3
     # A judge number must never overwrite something the trace already knows.
-    assert reg["step_repetition"]["value"] == 1
-    assert reg["latency_avg"]["value"] == 2000
+    assert reg["step_repetition"]["value"]["irina"]["value"] == 1
+    assert reg["latency_avg"]["value"]["irina"]["value"] == 1000
 
 
 def test_a_report_cannot_write_into_a_slot_that_is_not_a_judge_metric():
     reg = metrics.compute({**CTX, "report": {
         "values": {"latency_avg": 999, "not_a_metric": 1}}})
-    assert reg["latency_avg"]["value"] == 2000, "the report overwrote a live metric"
+    assert reg["latency_avg"]["value"]["irina"]["value"] == 1000, \
+        "the report overwrote a live metric"
 
 
 def test_a_null_in_the_report_does_not_become_a_zero():

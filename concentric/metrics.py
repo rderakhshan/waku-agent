@@ -25,6 +25,7 @@ None until a batch run fills them.
 
 from __future__ import annotations
 
+import itertools
 import json
 import math
 import re
@@ -85,25 +86,25 @@ SLOTS: tuple[dict[str, Any], ...] = (
 
     # -- how fast, how much? --------------------------------------------------
     {"id": "latency_avg", "label": "Latency, mean", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "ms", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "ms", "direction": "lower",
      "source": "trace", "filler": "a turn with an llm call in the trace"},
     {"id": "latency_p95", "label": "Latency, p95", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "ms", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "ms", "direction": "lower",
      "source": "trace", "filler": "a turn with an llm call in the trace"},
     {"id": "throughput", "label": "Throughput", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "turns/min", "direction": "higher",
+     "kind": "series", "changes": "per-turn", "unit": "turns/min", "direction": "higher",
      "source": "trace", "filler": "a completed turn in the trace"},
     {"id": "tokens_in", "label": "Tokens in", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "tokens", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "tokens", "direction": "lower",
      "source": "trace", "filler": "an llm call in the trace"},
     {"id": "tokens_out", "label": "Tokens out", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "tokens", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "tokens", "direction": "lower",
      "source": "trace", "filler": "an llm call in the trace"},
     {"id": "cost", "label": "Spend", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "usd", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "usd", "direction": "lower",
      "source": "trace", "filler": "an llm call whose model has a price"},
     {"id": "tool_errors", "label": "Tool errors", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "calls", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "calls", "direction": "lower",
      "source": "trace", "filler": "a tool call in the trace"},
     {"id": "gate_retrieval_ratio", "label": "Gate retrieval ratio", "state": "computed",
      "kind": "scalar", "changes": "per-turn", "unit": "ratio", "direction": "neutral",
@@ -117,16 +118,16 @@ SLOTS: tuple[dict[str, Any], ...] = (
 
     # -- how does it fail? ----------------------------------------------------
     {"id": "step_repetition", "label": "Step repetition", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "repeats", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "repeats", "direction": "lower",
      "source": "trace", "filler": "a tool call in the trace"},
     {"id": "unanswered_handoffs", "label": "Unanswered hand-offs", "state": "computed",
      "kind": "scalar", "changes": "per-turn", "unit": "handoffs", "direction": "lower",
      "source": "trace", "filler": "a delegate call in the trace"},
     {"id": "premature_terminations", "label": "Premature terminations", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "turns", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "turns", "direction": "lower",
      "source": "trace", "filler": "a turn in the trace"},
     {"id": "mandate_breaches", "label": "Mandate breaches", "state": "computed",
-     "kind": "scalar", "changes": "per-turn", "unit": "calls", "direction": "lower",
+     "kind": "series", "changes": "per-turn", "unit": "calls", "direction": "lower",
      "source": "trace", "filler": "a seat with a declared tool list"},
     {"id": "mast_reasoning_action_mismatch", "label": "MAST: reasoning-action mismatch",
      "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "traces",
@@ -211,7 +212,7 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "filler": "OPENAI_API_KEY, then a batch run: the seats' answers are embedded "
                "and compared pairwise"},
     {"id": "stance_shift", "label": "Total stance shift", "state": "computed",
-     "kind": "scalar", "changes": "per-run", "unit": "cosine", "direction": "neutral",
+     "kind": "series", "changes": "per-run", "unit": "cosine", "direction": "neutral",
      "source": "judge",
      "filler": "OPENAI_API_KEY, then a batch run: one seat's first answer against "
                "its last"},
@@ -811,11 +812,14 @@ def _semantic_values(events: list[dict]) -> dict:
             agreement.append(sum(pairs) / len(pairs))
             spread.append(1 - sum(pairs) / len(pairs))
 
-    shifts = []
-    for answers in seats.values():
+    shifts = {}
+    for seat, answers in seats.items():
         first, last = answers[0], answers[-1]
         if len(answers) >= 2 and first in vec and last in vec:
-            shifts.append(1 - embeddings.cosine(vec[first], vec[last]))
+            shifts[seat] = {
+                "value": round(1 - embeddings.cosine(vec[first], vec[last]), 4),
+                "n": len(answers),
+            }
 
     out = {}
     if agreement:
@@ -823,7 +827,7 @@ def _semantic_values(events: list[dict]) -> dict:
     if spread:
         out["semantic_diversity"] = round(sum(spread) / len(spread), 4)
     if shifts:
-        out["stance_shift"] = round(sum(shifts) / len(shifts), 4)
+        out["stance_shift"] = shifts
     return out
 
 
@@ -1192,6 +1196,180 @@ def _by_pair(events: list[dict], fn) -> dict | None:
     return out or None
 
 
+def _seat_turns(events: list[dict]) -> dict[str, list[list[dict]]]:
+    """{seat: [its events, one list per turn it took part in]}.
+
+    A seat does not own a turn — only the entry seat opens and closes one — so
+    the seat's own work has to be lifted out of the turn it sits inside. Several
+    of the per-agent metrics are only meaningful within a turn: two events a day
+    apart are not a latency.
+    """
+    out: dict[str, list[list[dict]]] = {}
+    for turn in _turns_of(events):
+        by_seat: dict[str, list[dict]] = {}
+        for ev in turn:
+            role = ev.get("role")
+            if role:
+                by_seat.setdefault(role, []).append(ev)
+        for seat, group in by_seat.items():
+            out.setdefault(seat, []).append(group)
+    return out
+
+
+def _sum_by_seat(events: list[dict], predicate, measure, unit=None) -> dict | None:
+    """Sum `measure(event)` over a seat's events that satisfy `predicate`."""
+    out = {}
+    for seat, turns in _seat_turns(events).items():
+        total = 0
+        n = 0
+        for group in turns:
+            for ev in group:
+                if predicate(ev):
+                    total += measure(ev)
+                    n += 1
+        if n:
+            out[seat] = {"value": round(total, 4), "n": n}
+    return out or None
+
+
+def _latency_by_seat(events: list[dict], pct: float | None = None) -> dict | None:
+    """Per seat: the gap between its own consecutive events inside a turn — how
+    long it spends between acting.
+
+    Deliberately not the department's latency_avg. That one is turn_start to the
+    last llm call, and no single seat owns a turn. This measures the seat, and
+    the two are not comparable — which is why they are two different rows.
+    """
+    out = {}
+    for seat, turns in _seat_turns(events).items():
+        gaps = []
+        for group in turns:
+            stamps = [t for t in (_parse(e.get("ts")) for e in group) if t]
+            gaps += [(b - a).total_seconds() * 1000
+                     for a, b in itertools.pairwise(stamps)]
+        if not gaps:
+            continue
+        gaps.sort()
+        value = (gaps[min(len(gaps) - 1, int(len(gaps) * pct))] if pct
+                 else statistics.mean(gaps))
+        out[seat] = {"value": round(value), "n": len(gaps)}
+    return out or None
+
+
+def _throughput_by_seat(events: list[dict]) -> dict | None:
+    """Per seat: turns it took part in, per minute of its own active time."""
+    out = {}
+    for seat, turns in _seat_turns(events).items():
+        active = 0.0
+        for group in turns:
+            stamps = [t for t in (_parse(e.get("ts")) for e in group) if t]
+            if len(stamps) >= 2:
+                active += (max(stamps) - min(stamps)).total_seconds()
+        if active <= 0:
+            continue
+        out[seat] = {"value": round(len(turns) / (active / 60), 4), "n": len(turns)}
+    return out or None
+
+
+def _repeats_by_seat(events: list[dict]) -> dict | None:
+    """The same tool with the same args twice inside one turn, per seat."""
+    out = {}
+    for seat, turns in _seat_turns(events).items():
+        repeats = 0
+        calls = 0
+        for group in turns:
+            seen = set()
+            for ev in group:
+                if ev.get("type") != "tool":
+                    continue
+                calls += 1
+                key = (ev.get("tool"),
+                       json.dumps(ev.get("args") or {}, sort_keys=True, default=str))
+                if key in seen:
+                    repeats += 1
+                seen.add(key)
+        if calls:
+            out[seat] = {"value": repeats, "n": calls}
+    return out or None
+
+
+def _breaches_by_seat(events: list[dict], department: dict) -> dict | None:
+    """Tool calls a seat made that its role does not hold."""
+    allowed = {s["role"]: set(s.get("tools") or [])
+               for s in department.get("seats", [])}
+    out = {}
+    for seat, turns in _seat_turns(events).items():
+        if seat not in allowed:
+            continue
+        calls = breaches = 0
+        for group in turns:
+            for ev in group:
+                if ev.get("type") != "tool" or not ev.get("tool"):
+                    continue
+                calls += 1
+                if ev["tool"] not in allowed[seat]:
+                    breaches += 1
+        if calls:
+            out[seat] = {"value": breaches, "n": calls}
+    return out or None
+
+
+def _early_stops_by_seat(events: list[dict]) -> dict | None:
+    """Turns that ended with nothing to say, attributed to the last seat to act.
+
+    This is an INFERENCE and the filler says so. turn_end carries no role —
+    only the entry seat owns a turn — so the seat cannot be read off the trace.
+    Blaming the last seat to act is a guess, and a guess labelled as one is
+    still worth more than a department count that blames nobody.
+    """
+    out: dict[str, dict] = {}
+    for turn in _turns_of(events):
+        ends = [e for e in turn if e.get("type") == "turn_end"]
+        if ends and (ends[-1].get("reply") or "").strip():
+            continue
+        acted = [e.get("role") for e in turn if e.get("role")]
+        if not acted:
+            continue
+        seat = acted[-1]
+        cell = out.setdefault(seat, {"value": 0, "n": 0})
+        cell["value"] += 1
+        cell["n"] += 1
+    return out or None
+
+
+def _cost_by_seat(usage: dict) -> dict | None:
+    """Spend per seat — already per-seat in the payload, so this only reshapes."""
+    rows = usage.get("by_seat") or []
+    out = {r["seat"]: {"value": round(r.get("cost") or 0, 4), "n": r.get("calls") or 0}
+           for r in rows if r.get("seat")}
+    return out or None
+
+
+def _tool_errors_by_seat(events: list[dict]) -> dict | None:
+    """Tool results that came back as errors, per seat. The classifier is waku's
+    own `_tool_status`, so the per-seat number and the department number cannot
+    disagree about what an error is."""
+    from waku.ops.dashboard import _tool_status
+
+    out = {}
+    for seat, turns in _seat_turns(events).items():
+        calls = errors = 0
+        for group in turns:
+            for ev in group:
+                if ev.get("type") != "tool":
+                    continue
+                calls += 1
+                if _tool_status(ev.get("output") or "") == "error":
+                    errors += 1
+        if calls:
+            out[seat] = {"value": errors, "n": calls}
+    return out or None
+
+
+def _is_llm(ev: dict) -> bool:
+    return ev.get("type") == "llm"
+
+
 # --- the eval and arena inputs -----------------------------------------------
 #
 # Two metrics need a file rather than a trace, because their numerator is
@@ -1334,20 +1512,22 @@ def compute(ctx: dict) -> dict[str, dict]:
         "preference_rate": _preference_rate(ctx.get("arena_runs") or [],
                                             ctx.get("arena_spec") or ""),
         "pass_at_k": _pass_at_k(ctx.get("arena_runs") or []),
-        "latency_avg": stats.get("latency_avg"),
-        "latency_p95": stats.get("latency_p95"),
-        "throughput": _throughput(events),
-        "tokens_in": stats.get("tokens_in"),
-        "tokens_out": stats.get("tokens_out"),
-        "cost": stats.get("cost"),
-        "tool_errors": stats.get("tool_errors"),
+        "latency_avg": _latency_by_seat(events),
+        "latency_p95": _latency_by_seat(events, pct=0.95),
+        "throughput": _throughput_by_seat(events),
+        "tokens_in": _sum_by_seat(events, _is_llm,
+                                  lambda e: (e.get("usage") or {}).get("in", 0)),
+        "tokens_out": _sum_by_seat(events, _is_llm,
+                                   lambda e: (e.get("usage") or {}).get("out", 0)),
+        "cost": _cost_by_seat(usage),
+        "tool_errors": _tool_errors_by_seat(events),
         "gate_retrieval_ratio": _gate_retrieval_ratio(stats),
         "cost_per_ring": _cost_per_ring(usage, department),
         "context_growth": _context_growth(events),
-        "step_repetition": _step_repetition(events),
+        "step_repetition": _repeats_by_seat(events),
         "unanswered_handoffs": _unanswered_handoffs(events),
-        "premature_terminations": _premature_terminations(events),
-        "mandate_breaches": _mandate_breaches(events, department),
+        "premature_terminations": _early_stops_by_seat(events),
+        "mandate_breaches": _breaches_by_seat(events, department),
         "delegation_depth": _delegation_depth(events),
         "delegation_breadth": len({r for _, r, _ in _delegations(events)}) or None,
         "handoff_latency": _handoff_latency(events),

@@ -156,9 +156,18 @@
     });
   }
 
+  // A per-seat value is a dict; the department-level sentences need one number.
+  // The tables stay per-seat — only the verdict and the watch list collapse.
+  function totalOf(slot) {
+    const v = slot && slot.value;
+    if (v === null || v === undefined) return null;
+    if (typeof v !== "object") return v;
+    return Object.values(v).reduce((n, cell) => n + ((cell && cell.value) || 0), 0);
+  }
+
   function verdict(m, d) {
     const turns = (d.stats && d.stats.turns) || 0;
-    const val = (id) => (m[id] && m[id].value !== null) ? m[id].value : null;
+    const val = (id) => totalOf(m[id]);
     const parts = [];
     const stopped = val("premature_terminations");
     const silent = val("unanswered_handoffs");
@@ -174,14 +183,14 @@
 
   function attention(m, rows) {
     const flagged = WATCH
-      .map((id) => m[id])
-      .filter((s) => s && typeof s.value === "number" && s.value > 0);
+      .map((id) => ({ slot: m[id], total: totalOf(m[id]) }))
+      .filter((x) => x.slot && typeof x.total === "number" && x.total > 0);
     const gaps = rows.filter((s) => s.value === null && s.state !== "placeholder");
     const body = [];
     if (flagged.length) {
-      body.push(table(["what", "count", "unit"], flagged.map((s) => [
-        `<b>${esc(s.label)}</b>`, `<code>${show(s.value)}</code>`,
-        `<span class="meta">${esc(s.unit)}</span>`])));
+      body.push(table(["what", "count", "unit"], flagged.map((x) => [
+        `<b>${esc(x.slot.label)}</b>`, `<code>${show(x.total)}</code>`,
+        `<span class="meta">${esc(x.slot.unit)}</span>`])));
     } else {
       body.push(`<p class="lab-quiet">Nothing in the health instruments is above zero.</p>`);
     }
