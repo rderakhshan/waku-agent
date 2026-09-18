@@ -122,3 +122,45 @@ def test_the_throughput_is_the_inverse_of_active_time():
     0.003, which is why it is computed this way."""
     value = metrics.compute(CTX)["throughput"]["value"]
     assert value is not None and 39 < value < 41, value
+
+
+# --- the batch report --------------------------------------------------------
+
+REPORT = {
+    "ran_at": "2026-01-01T00:00:00+00:00",
+    "scored": 12,
+    "of_turns": 20,
+    "values": {
+        "average_reward": 0.72,
+        "mast_reasoning_action_mismatch": 3,
+        "mast_information_withholding": 0,
+    },
+}
+
+
+def test_a_report_fills_only_the_slots_it_is_allowed_to():
+    reg = metrics.compute({**CTX, "report": REPORT})
+    assert reg["average_reward"]["value"] == 0.72
+    assert reg["mast_reasoning_action_mismatch"]["value"] == 3
+    # A judge number must never overwrite something the trace already knows.
+    assert reg["step_repetition"]["value"] == 1
+    assert reg["latency_avg"]["value"] == 2000
+
+
+def test_a_report_cannot_write_into_a_slot_that_is_not_a_judge_metric():
+    reg = metrics.compute({**CTX, "report": {
+        "values": {"latency_avg": 999, "not_a_metric": 1}}})
+    assert reg["latency_avg"]["value"] == 2000, "the report overwrote a live metric"
+
+
+def test_a_null_in_the_report_does_not_become_a_zero():
+    """The rule again, one layer out: a judge that scored nothing must leave the
+    slot empty rather than report a confident zero."""
+    reg = metrics.compute({**CTX, "report": {"values": {"average_reward": None}}})
+    assert reg["average_reward"]["value"] is None
+
+
+def test_no_report_leaves_every_judge_slot_empty():
+    reg = metrics.compute(CTX)
+    for mid in metrics.JUDGE_METRICS:
+        assert reg[mid]["value"] is None, f"{mid} has a value with no report"

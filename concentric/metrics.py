@@ -506,6 +506,158 @@ def _context_growth(events: list[dict]) -> dict[str, int] | None:
     return {str(k): round(statistics.mean(v)) for k, v in sorted(acc.items())}
 
 
+# --- the batch report --------------------------------------------------------
+#
+# The metrics that need a reader cannot run in the 5s poll, so they run when
+# asked and land in a file. This is the same pattern as `eval_report.json`: the
+# expensive thing writes once, the dashboard reads forever, and the page never
+# calls a model.
+
+# Which slots the report is allowed to fill. Listing them means a stray key in
+# the file cannot quietly become a measurement.
+JUDGE_METRICS = ("average_reward", "mast_reasoning_action_mismatch",
+                 "mast_information_withholding")
+
+
+def _home_env() -> None:
+    """Point waku at Irina's home BEFORE anything imports waku.config.
+
+    Every function here that touches waku calls this first. Without it the
+    collector reads the default home while `_events()` reads Irina's, and the
+    registry mixes two corpora — which is exactly what the first catalogue run
+    did, and what made `latency_avg` disagree with `throughput` by a factor of
+    twenty. `load_dotenv()` does not override an already-set variable, so a
+    `setdefault` here wins over a developer's `.env`.
+    """
+    import os
+
+    from concentric import ENTRY, MODEL, PROVIDER, SMALL_MODEL, seat_home
+
+    os.environ.setdefault("WAKU_HOME", str(seat_home(ENTRY)))
+    os.environ.setdefault("WAKU_PROVIDER", PROVIDER)
+    os.environ.setdefault("WAKU_MODEL", MODEL)
+    os.environ.setdefault("WAKU_SMALL_MODEL", SMALL_MODEL)
+
+
+def report_path():
+    """Where the batch run writes, beside the eval report it mirrors."""
+    _home_env()
+    from waku.config import load_settings
+
+    settings = load_settings()
+    settings.ensure_home()
+    return settings.home / "metrics_report.json"
+
+
+def load_report() -> dict:
+    """The last batch run, or an empty dict. A missing or unreadable report is
+    not an error: it means nobody has run one, and every judge slot stays None."""
+    path = report_path()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _ask(prompt: str, max_tokens: int = 700) -> str:
+    """One judge call, through the same client the agent uses. No new
+    dependency: waku's provider adapter is already the only door to a model."""
+    from waku.config import load_settings
+    from waku.loop.models import get_client
+
+    settings = load_settings()
+    client = get_client(settings)
+    response = client.messages.create(
+        model=settings.small_model, max_tokens=max_tokens,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return "".join(b.text for b in response.content if b.type == "text")
+
+
+def _digest(turn: list[dict]) -> str:
+    """One turn as a few readable lines. The judge sees what a reader would:
+    who was asked, what they called, and what came back."""
+    lines = []
+    for ev in turn:
+        kind = ev.get("type")
+        role = ev.get("role") or "entry"
+        if kind == "turn_start":
+            lines.append(f"ASK: {(ev.get('user_message') or '')[:220]}")
+        elif kind == "tool":
+            target = (ev.get("args") or {}).get("role") or ev.get("tool")
+            lines.append(f"TOOL {role} -> {target}: {(ev.get('output') or '')[:120]}")
+        elif kind == "turn_end":
+            lines.append(f"REPLY: {(ev.get('reply') or '')[:400]}")
+    return "\n".join(lines)
+
+
+RUBRIC = """You are labelling one turn of a multi-agent system for two known
+failure modes, and scoring the reply.
+
+  reasoning_action_mismatch: the reply contradicts or ignores something a tool
+    or a delegated agent actually returned.
+  information_withholding: an agent held information another agent needed and
+    did not pass it on.
+
+Reply with ONLY this JSON, no prose:
+{"reasoning_action_mismatch": 0 or 1, "information_withholding": 0 or 1,
+ "reward": a number from 0.0 to 1.0 for how well the turn served the ask}
+
+TURN:
+"""
+
+
+def run(limit: int = 20) -> dict:
+    """Score the most recent turns and write the report. This is the only
+    function here that spends money, and it never runs from the dashboard."""
+    ctx = context()
+    turns = [t for t in _turns_of(ctx.get("events") or []) if len(t) > 1]
+    sample = turns[-limit:]
+    hits = {"mast_reasoning_action_mismatch": 0, "mast_information_withholding": 0}
+    rewards = []
+    errors = []
+    for turn in sample:
+        try:
+            raw = _ask(RUBRIC + _digest(turn))
+            start, end = raw.index("{"), raw.rindex("}") + 1
+            verdict = json.loads(raw[start:end])
+        except (ValueError, json.JSONDecodeError, OSError) as exc:
+            errors.append(str(exc)[:120])
+            continue
+        for key in hits:
+            hits[key] += 1 if verdict.get(key) else 0
+        if isinstance(verdict.get("reward"), (int, float)):
+            rewards.append(float(verdict["reward"]))
+
+    values: dict[str, Any] = dict(hits)
+    values["average_reward"] = round(sum(rewards) / len(rewards), 4) if rewards else None
+
+    record = {
+        "ran_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        "scored": len(rewards),
+        "of_turns": len(sample),
+        "values": values,
+        "errors": errors[:5],
+    }
+    report_path().write_text(json.dumps(record, indent=2), encoding="utf-8")
+    return record
+
+
+def apply_report(reg: dict[str, dict], report: dict) -> int:
+    """Merge a report into the registry. Only ids in JUDGE_METRICS are accepted,
+    and only when the value is present — a null in the report leaves the slot
+    None rather than writing a zero."""
+    values = (report or {}).get("values") or {}
+    applied = 0
+    for mid in JUDGE_METRICS:
+        if mid in reg and isinstance(values.get(mid), (int, float)):
+            reg[mid]["value"] = values[mid]
+            applied += 1
+    return applied
+
+
 # --- the registry, filled ----------------------------------------------------
 
 def compute(ctx: dict) -> dict[str, dict]:
@@ -554,8 +706,11 @@ def compute(ctx: dict) -> dict[str, dict]:
     # One timestamp for the whole pass: the individual computations are
     # microseconds, and a per-metric clock would cost more than it reports.
     elapsed = round((time.perf_counter() - started) * 1000, 3)
-    for slot in reg.values():
-        slot["cost_ms"] = elapsed if slot["value"] is not None else None
+    for mid in fills:
+        reg[mid]["cost_ms"] = elapsed if reg[mid]["value"] is not None else None
+    # The batch report last, so a judge number never overwrites a live one and
+    # never lands in a slot the report is not allowed to fill.
+    apply_report(reg, ctx.get("report") or {})
     return reg
 
 
@@ -620,15 +775,7 @@ def context() -> dict:
     which is precisely what the first catalogue run did, and what made
     `latency_avg` disagree with `throughput` by a factor of twenty.
     """
-    import os
-
-    from concentric import ENTRY, MODEL, PROVIDER, SMALL_MODEL, seat_home
-
-    os.environ.setdefault("WAKU_HOME", str(seat_home(ENTRY)))
-    os.environ.setdefault("WAKU_PROVIDER", PROVIDER)
-    os.environ.setdefault("WAKU_MODEL", MODEL)
-    os.environ.setdefault("WAKU_SMALL_MODEL", SMALL_MODEL)
-
+    _home_env()
     from concentric.collect import _events, collect_department
 
     data = collect_department()
@@ -642,6 +789,7 @@ def context() -> dict:
         "episodes": data.get("episodes") or [],
         "chat_pending": data.get("chat_pending") or 0,
         "eval_report": data.get("eval_report"),
+        "report": load_report(),
     }
 
 
@@ -654,6 +802,15 @@ def main() -> None:
             stream.reconfigure(encoding="utf-8")
         except (AttributeError, OSError, ValueError):
             pass
+    if "--run" in sys.argv:
+        record = run()
+        print(f"scored {record['scored']} of {record['of_turns']} turns; "
+              f"wrote {report_path()}")
+        for key, value in record["values"].items():
+            print(f"  {key:<32} {value}")
+        if record["errors"]:
+            print(f"  {len(record['errors'])} turn(s) could not be scored")
+        return
     print(catalogue(compute(context())))
 
 
