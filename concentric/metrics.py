@@ -1419,6 +1419,122 @@ def _peer_pairs(events: list[dict]) -> dict | None:
     return {key: {"value": n, "n": n} for key, n in sorted(counts.items())}
 
 
+# --- what one turn contributed to a metric -----------------------------------
+#
+# The history stores readings, not turns. The traces already hold every turn, and
+# copying them into the database would be storing the same thing twice — and the
+# copy would rot the moment a trace format changed.
+#
+# So the cause of a change is QUERIED: the window between two readings, the turns
+# inside it, and what each contributed. These are the ones defined per turn.
+
+def _dup_in_turn(turn: list[dict]) -> int:
+    seen, repeats = set(), 0
+    for ev in turn:
+        if ev.get("type") != "tool":
+            continue
+        key = (ev.get("role"), ev.get("tool"),
+               json.dumps(ev.get("args") or {}, sort_keys=True, default=str))
+        if key in seen:
+            repeats += 1
+        seen.add(key)
+    return repeats
+
+
+def _stopped_early(turn: list[dict]) -> int:
+    ends = [e for e in turn if e.get("type") == "turn_end"]
+    return 0 if ends and (ends[-1].get("reply") or "").strip() else 1
+
+
+def _errors_in_turn(turn: list[dict]) -> int:
+    from waku.ops.dashboard import _tool_status
+
+    return sum(1 for ev in turn
+               if ev.get("type") == "tool" and _tool_status(ev.get("output") or "") == "error")
+
+
+def _consults_in_turn(turn: list[dict]) -> int:
+    return sum(1 for ev in turn
+               if ev.get("type") == "tool" and ev.get("tool") == "consult_peer")
+
+
+def _tokens_in_turn(turn: list[dict]) -> int:
+    return sum((e.get("usage") or {}).get("in", 0) for e in turn if e.get("type") == "llm")
+
+
+def _tokens_out_turn(turn: list[dict]) -> int:
+    return sum((e.get("usage") or {}).get("out", 0) for e in turn if e.get("type") == "llm")
+
+
+def _breaches_in_turn(turn: list[dict], allowed: dict) -> int:
+    return sum(1 for ev in turn
+               if ev.get("type") == "tool" and ev.get("tool")
+               and ev.get("role") in allowed
+               and ev["tool"] not in allowed[ev["role"]])
+
+
+TURN_CONTRIB = {
+    "step_repetition": _dup_in_turn,
+    "premature_terminations": _stopped_early,
+    "tool_errors": _errors_in_turn,
+    "consultations": _consults_in_turn,
+    "tokens_in": _tokens_in_turn,
+    "tokens_out": _tokens_out_turn,
+}
+
+
+def _involves(turn: list[dict], subject: str) -> bool:
+    """Did this turn involve the seat or the pair the metric is about?"""
+    if not subject:
+        return True
+    if ">" in subject:
+        src, dst = subject.split(">", 1)
+        return any(ev.get("role") == src
+                   and (ev.get("args") or {}).get("role") == dst
+                   for ev in turn if ev.get("type") == "tool")
+    return any(ev.get("role") == subject for ev in turn)
+
+
+def contributions(metric: str, subject: str, since: str | None, until: str | None,
+                  events: list[dict], department: dict) -> list[dict]:
+    """The turns in a window that contributed to a metric, biggest first.
+
+    Only the metrics defined per turn carry a number here. For the rest the turns
+    are still listed — they ARE the window — but with no value rather than a
+    made-up one, which is the same rule the registry follows everywhere else.
+    """
+    fn = TURN_CONTRIB.get(metric)
+    allowed = {s["role"]: set(s.get("tools") or [])
+               for s in department.get("seats", [])}
+    out = []
+    for turn in _turns_of(events):
+        ts = _turn_ts(turn)
+        if not ts or not _after(ts, since):
+            continue
+        # An absent upper bound is no bound. `_after(ts, None)` is True — "after
+        # nothing" — which is the right answer for a lower bound and the wrong
+        # one here: it skipped every turn and the cause came back empty.
+        if until and _after(ts, until):
+            continue
+        if not _involves(turn, subject):
+            continue
+        if fn:
+            value = fn(turn)
+        elif metric == "mandate_breaches":
+            value = _breaches_in_turn(turn, allowed)
+        else:
+            value = None
+        out.append({
+            "ts": ts,
+            "value": value,
+            "ask": (next((e.get("user_message") for e in turn
+                          if e.get("type") == "turn_start"), "") or "")[:160],
+            "roles": sorted({e.get("role") for e in turn if e.get("role")}),
+        })
+    out.sort(key=lambda r: (-(r["value"] or 0), r["ts"]))
+    return out
+
+
 # --- the eval and arena inputs -----------------------------------------------
 #
 # Two metrics need a file rather than a trace, because their numerator is

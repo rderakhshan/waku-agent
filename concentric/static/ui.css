@@ -797,3 +797,18 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
   background:var(--surface-paper);color:var(--text-ink);
   border:var(--rule-width) solid var(--rule);border-radius:var(--radius-sm,4px);
   padding:2px 4px}
+
+/* ---- the cause: the turns behind a change.
+   The reading said WHEN; this says which turns. */
+.lab-trend{cursor:pointer}
+.lab-cause{padding:2px 0}
+.lab-cause-head{font-size:var(--text-sm);color:var(--text-ink);margin-bottom:var(--space-2)}
+.lab-cause-row{display:flex;align-items:baseline;gap:var(--space-3);
+  padding:3px 0;font-size:var(--text-sm);
+  border-top:var(--rule-width) solid var(--rule)}
+.lab-cause-row:first-of-type{border-top:0}
+.lab-cause-row code{font-family:var(--face-mono);font-size:var(--text-xs);
+  color:var(--text-faint);white-space:nowrap}
+.lab-cause-value{font-family:var(--face-mono);font-size:var(--text-xs);
+  color:var(--text-ink);min-width:3ch;text-align:right}
+.lab-cause-row .meta{flex:1;min-width:0;overflow-wrap:anywhere}

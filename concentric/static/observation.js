@@ -93,12 +93,58 @@
       change > 0 ? "+" : ""}${shown}</span>`;
   }
 
+  // The turns behind a change, fetched on demand. Nothing is stored for this:
+  // the traces hold every turn, and the reading only says WHICH window to look
+  // in. So the panel is a query, not a copy.
+  let cause = null;
+
+  async function loadCause(metric, subject) {
+    cause = { metric, subject, loading: true, turns: [] };
+    if (typeof render === "function") render();
+    try {
+      const data = cachedSeries(metric);
+      const points = (data && data[subject]) || [];
+      const from = points.length ? points[points.length - 1].bucket : "";
+      const res = await fetch("/api/metrics/cause"
+        + `?metric=${encodeURIComponent(metric)}`
+        + `&subject=${encodeURIComponent(subject)}`
+        + `&from=${encodeURIComponent(from)}`);
+      const json = await res.json();
+      cause = { metric, subject, loading: false, turns: json.turns || [],
+                total: json.total || 0 };
+    } catch (e) {
+      cause = { metric, subject, loading: false, turns: [], error: String(e) };
+    }
+    if (typeof render === "function") render();
+  }
+
+  function causeRow(seat, span) {
+    const c = cause || {};
+    const head = `<div class="lab-cause-head"><b>${esc(c.metric)}</b> ·
+      the turns behind ${esc(seat)}${c.total ? ` · ${c.total} in the window` : ""}</div>`;
+    let body;
+    if (c.loading) {
+      body = `<p class="meta">reading the traces…</p>`;
+    } else if (!c.turns.length) {
+      body = `<p class="meta">no turn in this window involves this seat</p>`;
+    } else {
+      body = c.turns.map((t) => `<div class="lab-cause-row">
+          <code>${esc(String(t.ts || "").slice(0, 19).replace("T", " "))}</code>
+          <span class="lab-cause-value">${t.value === null ? "·" : esc(t.value)}</span>
+          <span class="meta">${esc(t.ask || "")}</span></div>`).join("");
+    }
+    return `<tr class="lab-detail"><td colspan="${span}">
+      <div class="lab-cause">${head}${body}</div></td></tr>`;
+  }
+
   function trendCell(metric, subject, direction) {
     const data = cachedSeries(metric);
     if (!data) return `<span class="lab-spark-wait" title="loading"></span>`;
     const points = data[subject];
     if (!points || !points.length) return "";
-    return `<span class="lab-trend">${sparkline(points)}${deltaOf(points, direction)}</span>`;
+    return `<span class="lab-trend" data-metric="${esc(metric)}"
+        data-seat="${esc(subject)}" title="click for the turns behind this">${
+      sparkline(points)}${deltaOf(points, direction)}</span>`;
   }
 
   // The health metrics. A seat is "a problem" if any of them is above zero —
@@ -423,6 +469,13 @@
   }
 
   function detailRow(m, seat, cols) {
+    // A cause was asked for, so show that instead of the readings: the reader
+    // clicked a number to find out what moved it, not to see more numbers.
+    //
+    // seat.role, not seat — this is handed the seat OBJECT, and comparing a role
+    // string against an object is false every time. The panel simply never
+    // appeared, with no error to say why.
+    if (cause && cause.subject === seat.role) return causeRow(seat.role, cols.length + 2);
     const shownIds = new Set(cols.map((c) => c.id));
     const rows = Object.values(m)
       .map((slot) => {
@@ -475,8 +528,19 @@
     document.querySelectorAll(".lab-seat").forEach((row) => {
       row.addEventListener("click", () => {
         const seat = row.getAttribute("data-seat");
+        cause = null;
         openSeat = (openSeat === seat) ? null : seat;
         if (typeof render === "function") render();
+      });
+    });
+    // A trend is its own target: clicking it asks what moved, and the row's own
+    // click must not swallow that.
+    document.querySelectorAll(".lab-trend").forEach((el) => {
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const seat = el.getAttribute("data-seat");
+        openSeat = seat;
+        loadCause(el.getAttribute("data-metric"), seat);
       });
     });
   }

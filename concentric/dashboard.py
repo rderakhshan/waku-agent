@@ -347,6 +347,32 @@ def _handler_class():
                 self._send(_inject(html).encode("utf-8"),
                            "text/html; charset=utf-8", no_cache=True)
                 return
+            if path == "/api/metrics/cause":
+                # The turns behind a change. Not stored anywhere: the traces hold
+                # every turn, so this is a query over the window between two
+                # readings rather than a copy of what is already on disk.
+                from urllib.parse import parse_qs
+
+                from concentric import metrics as metric_mod
+
+                query = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                metric = (query.get("metric") or [""])[0]
+                if not metric:
+                    self._send(json.dumps({"error": "metric is required"}).encode(),
+                               "application/json", no_cache=True)
+                    return
+                ctx = metric_mod.context()
+                rows = metric_mod.contributions(
+                    metric,
+                    (query.get("subject") or [""])[0],
+                    (query.get("from") or [None])[0],
+                    (query.get("to") or [None])[0],
+                    ctx.get("events") or [],
+                    ctx.get("department") or {})
+                self._send(json.dumps({"metric": metric, "turns": rows[:20],
+                                       "total": len(rows)}).encode("utf-8"),
+                           "application/json", no_cache=True)
+                return
             if path == "/api/metrics/series":
                 # One metric, every subject, in one request. A sparkline per cell
                 # would otherwise be 15 columns x 24 seats = 360 requests every
