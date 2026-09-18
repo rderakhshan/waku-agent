@@ -18,8 +18,9 @@
   const LENSES = [
     ["Health", "How it fails, and whether it holds together", [
       "premature_terminations", "unanswered_handoffs", "step_repetition",
-      "mandate_breaches", "mast_reasoning_action_mismatch",
-      "mast_information_withholding", "mast_annotator_agreement",
+      "mandate_breaches", "hallucination_rate",
+      "mast_reasoning_action_mismatch", "mast_information_withholding",
+      "mast_annotator_agreement",
       "stance_convergence", "stance_shift", "semantic_diversity"]],
     ["Effort", "Where the time and money go", [
       "cost", "cost_per_ring", "latency_avg", "latency_p95", "throughput",

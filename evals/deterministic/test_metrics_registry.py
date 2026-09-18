@@ -231,3 +231,54 @@ def test_no_embedding_key_means_no_semantic_metrics(monkeypatch):
     reg = metrics.compute({**CTX, "events": _semantic_events("alpha")})
     for mid in ("stance_convergence", "stance_shift", "semantic_diversity"):
         assert reg[mid]["value"] is None
+
+
+# --- grounding and labeler agreement -----------------------------------------
+
+def _grounding_events() -> list[dict]:
+    """Two turns, each with something a tool returned and a reply to check."""
+    out = []
+    for i in range(2):
+        out += [
+            {"type": "turn_start", "user_message": f"q{i}",
+             "ts": f"2026-01-01T00:0{i}:00+00:00"},
+            {"type": "tool", "role": "irina", "tool": "manage_memory",
+             "args": {"action": "search"}, "output": f"fact {i}",
+             "ts": f"2026-01-01T00:0{i}:01+00:00"},
+            {"type": "turn_end", "reply": f"answer {i}",
+             "ts": f"2026-01-01T00:0{i}:02+00:00"},
+        ]
+    return out
+
+
+def test_grounding_is_scored_two_ways_from_one_judgement(monkeypatch):
+    replies = iter(['{"grounded": 1}', '{"grounded": 0}'])
+    monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700: next(replies))
+    values = metrics._grounding_values(_grounding_events())
+    assert values["factual_grounding"] == 0.5
+    assert values["hallucination_rate"] == 0.5
+
+
+def test_a_judge_that_cannot_answer_is_no_measurement(monkeypatch):
+    monkeypatch.setattr(metrics, "_ask",
+                        lambda p, max_tokens=700: "I am unable to help with that")
+    assert metrics._grounding_values(_grounding_events()) == {}
+
+
+def test_kappa_is_one_when_two_labelers_agree_on_a_varied_set():
+    assert metrics.kappa([0, 1, 0, 1, 1], [0, 1, 0, 1, 1]) == 1.0
+
+
+def test_kappa_is_zero_when_the_agreement_is_only_chance():
+    assert metrics.kappa([0, 1, 0, 1], [0, 0, 1, 1]) == 0.0
+
+
+def test_kappa_is_undefined_when_a_labeler_never_varies():
+    """Both saying "no failure" every time is perfect agreement that measured
+    nothing. This is why the taxonomy asks for kappa rather than a percentage."""
+    assert metrics.kappa([0, 0, 0], [0, 0, 0]) is None
+
+
+def test_kappa_needs_two_lists_of_the_same_length():
+    assert metrics.kappa([0, 1], [0]) is None
+    assert metrics.kappa([], []) is None

@@ -63,12 +63,15 @@ SLOTS: tuple[dict[str, Any], ...] = (
     {"id": "pass_at_k", "label": "Pass@k", "state": "ready",
      "kind": "scalar", "changes": "per-run", "unit": "probability", "direction": "higher",
      "source": "eval", "filler": "each dataset case run k times"},
-    {"id": "hallucination_rate", "label": "Hallucination rate", "state": "ready",
+    {"id": "hallucination_rate", "label": "Hallucination rate", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "lower",
-     "source": "judge", "filler": "a groundedness judge over reply versus retrieved facts"},
-    {"id": "factual_grounding", "label": "Factual grounding", "state": "ready",
+     "source": "judge",
+     "filler": "a batch run: a groundedness judge reads each reply against what "
+               "its tools actually returned"},
+    {"id": "factual_grounding", "label": "Factual grounding", "state": "computed",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "higher",
-     "source": "judge", "filler": "the same judge, scored the other way"},
+     "source": "judge",
+     "filler": "the same batch run and the same judge, scored the other way"},
     {"id": "context_retention", "label": "Context retention", "state": "ready",
      "kind": "scalar", "changes": "per-run", "unit": "ratio", "direction": "higher",
      "source": "judge", "filler": "multi-turn scenarios probing a seat's own store"},
@@ -127,9 +130,9 @@ SLOTS: tuple[dict[str, Any], ...] = (
      "direction": "lower", "source": "judge",
      "filler": "a batch run: python -m concentric.metrics --run"},
     {"id": "mast_annotator_agreement", "label": "Cohen's kappa (labeler agreement)",
-     "state": "ready", "kind": "scalar", "changes": "per-run", "unit": "kappa",
+     "state": "computed", "kind": "scalar", "changes": "per-run", "unit": "kappa",
      "direction": "higher", "source": "judge",
-     "filler": "two labelers over the same traces"},
+     "filler": "a batch run: the same traces labelled twice, and kappa between them"},
 
     # -- how does work move? --------------------------------------------------
     {"id": "delegation_depth", "label": "Delegation depth reached", "state": "computed",
@@ -748,7 +751,8 @@ def _semantic_values(events: list[dict]) -> dict:
 # Which slots the report is allowed to fill. Listing them means a stray key in
 # the file cannot quietly become a measurement.
 JUDGE_METRICS = ("average_reward", "mast_reasoning_action_mismatch",
-                 "mast_information_withholding",
+                 "mast_information_withholding", "mast_annotator_agreement",
+                 "hallucination_rate", "factual_grounding",
                  "stance_convergence", "stance_shift", "semantic_diversity",
                  "bertscore", "bleu_rouge_meteor")
 
@@ -827,6 +831,116 @@ def _digest(turn: list[dict]) -> str:
     return "\n".join(lines)
 
 
+GROUNDING = """You are checking one turn of an agent for grounding.
+
+The TOOLS block is everything the agent actually saw: what its tools and its
+delegated seats returned. The REPLY block is what it told the user.
+
+  grounded: every factual claim in the reply is supported by the tools block.
+    A reply that says it could not confirm something is grounded. A reply that
+    states a fact the tools never returned is not.
+
+Reply with ONLY this JSON, no prose:
+{"grounded": 0 or 1}
+
+"""
+
+
+def _grounding_values(events: list[dict]) -> dict:
+    """Hallucination rate and factual grounding: one question, scored two ways.
+
+    Both read the trace and nothing else. The tools block is what the agent
+    actually saw, so a claim that is not in it came from somewhere other than
+    the work — which is the whole definition of an ungrounded reply.
+    """
+    turns = [t for t in _turns_of(events) if len(t) > 1]
+    scored = grounded = 0
+    for turn in turns:
+        tools = [(ev.get("output") or "").strip() for ev in turn
+                 if ev.get("type") == "tool" and ev.get("output")]
+        reply = next((e.get("reply") for e in reversed(turn)
+                      if e.get("type") == "turn_end"), None)
+        if not tools or not reply:
+            continue
+        verdict = _judge_json(GROUNDING
+                              + "TOOLS:\n" + "\n".join(tools)[:4000]
+                              + "\n\nREPLY:\n" + reply[:2000])
+        if verdict is None or "grounded" not in verdict:
+            continue
+        scored += 1
+        grounded += 1 if verdict.get("grounded") else 0
+    if not scored:
+        return {}
+    return {"factual_grounding": round(grounded / scored, 4),
+            "hallucination_rate": round(1 - grounded / scored, 4)}
+
+
+AGREEMENT_A = """Label this turn for one failure mode.
+reasoning_action_mismatch: the reply contradicts or ignores what a tool returned.
+Reply with ONLY {"reasoning_action_mismatch": 0 or 1}.
+
+TURN:
+"""
+AGREEMENT_B = """A colleague labelled this turn. Give your own independent
+judgement, from the evidence only.
+Does the reply contradict or ignore anything a tool returned?
+Reply with ONLY {"reasoning_action_mismatch": 0 or 1}.
+
+TURN:
+"""
+
+
+def kappa(a: list[int], b: list[int]) -> float | None:
+    """Cohen's kappa between two labelers.
+
+    Plain agreement is not enough: two labelers who both say "no failure" every
+    time agree perfectly and have measured nothing. Kappa subtracts the
+    agreement that chance alone would produce, which is why the taxonomy names
+    it rather than a percentage.
+    """
+    n = len(a)
+    if n == 0 or n != len(b):
+        return None
+    observed = sum(1 for x, y in zip(a, b, strict=True) if x == y) / n
+    pa, pb = sum(a) / n, sum(b) / n
+    expected = pa * pb + (1 - pa) * (1 - pb)
+    if expected >= 1:
+        return None          # both labelers constant and identical: undefined
+    return round((observed - expected) / (1 - expected), 4)
+
+
+def _agreement_values(events: list[dict], sample: list[list[dict]]) -> dict:
+    """How much two labelings of the same traces agree.
+
+    The two prompts differ in framing, not in question, so what kappa measures
+    here is the labeler's own stability — a low value means the failure mode is
+    being guessed at rather than read.
+    """
+    first, second = [], []
+    for turn in sample:
+        digest = _digest(turn)
+        va = _judge_json(AGREEMENT_A + digest)
+        vb = _judge_json(AGREEMENT_B + digest)
+        if va is None or vb is None:
+            continue
+        if "reasoning_action_mismatch" not in va or "reasoning_action_mismatch" not in vb:
+            continue
+        first.append(1 if va["reasoning_action_mismatch"] else 0)
+        second.append(1 if vb["reasoning_action_mismatch"] else 0)
+    value = kappa(first, second)
+    return {"mast_annotator_agreement": value} if value is not None else {}
+
+
+def _judge_json(prompt: str, max_tokens: int = 400) -> dict | None:
+    """One judge call, parsed. None on any failure — a metric that cannot be
+    computed is None, and a bad judge reply must not take the run down."""
+    try:
+        raw = _ask(prompt, max_tokens=max_tokens)
+        return json.loads(raw[raw.index("{"):raw.rindex("}") + 1])
+    except (ValueError, json.JSONDecodeError, OSError):
+        return None
+
+
 RUBRIC = """You are labelling one turn of a multi-agent system for two known
 failure modes, and scoring the reply.
 
@@ -870,6 +984,8 @@ def run(limit: int = 20) -> dict:
     # The semantic and reference metrics need the same turn data, so they ride
     # the same run rather than each paying for their own pass over the corpus.
     events = ctx.get("events") or []
+    values.update(_grounding_values(events))
+    values.update(_agreement_values(events, sample))
     values.update(_semantic_values(events))
     values.update(_reference_values(events))
 
