@@ -347,6 +347,42 @@ def _handler_class():
                 self._send(_inject(html).encode("utf-8"),
                            "text/html; charset=utf-8", no_cache=True)
                 return
+            if path == "/api/metrics/series":
+                # One metric, every subject, in one request. A sparkline per cell
+                # would otherwise be 15 columns x 24 seats = 360 requests every
+                # time the reader changed the granularity.
+                from urllib.parse import parse_qs
+
+                from concentric import history
+                from concentric import metrics as metric_mod
+
+                query = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                metric = (query.get("metric") or [""])[0]
+                granularity = (query.get("granularity") or ["daily"])[0]
+                since = (query.get("since") or [None])[0]
+                limit = int((query.get("limit") or ["40"])[0])
+                if not metric:
+                    self._send(json.dumps({"error": "metric is required"}).encode(),
+                               "application/json", no_cache=True)
+                    return
+                how = metric_mod.AGG.get(metric, "last")
+                out: dict = {"metric": metric, "granularity": granularity, "agg": how}
+                try:
+                    conn = history.connect()
+                    try:
+                        for subject in history.subjects(metric, conn):
+                            points = history.series(metric, subject, granularity, since,
+                                                    how, conn)["points"]
+                            out[subject] = points[-limit:]
+                    finally:
+                        conn.close()
+                except ValueError as exc:
+                    self._send(json.dumps({"error": str(exc)}).encode(),
+                               "application/json", no_cache=True)
+                    return
+                self._send(json.dumps(out).encode("utf-8"),
+                           "application/json", no_cache=True)
+                return
             if path == "/api/metrics/history":
                 # One series, not the whole history: the Lab asks per metric when
                 # it draws a trend, and shipping every series in the payload would

@@ -23,6 +23,84 @@
   let allColumns = false;
   let openSeat = null;
 
+  // The bucket every sparkline is drawn at, and a cache so the 5s re-render does
+  // not re-fetch the same series. Sixty seconds is shorter than the recording
+  // cadence, so a refresh never shows a stale point for long.
+  let granularity = "daily";
+  const seriesCache = new Map();
+  const SERIES_TTL = 60000;
+
+  const GRANULARITIES = ["hourly", "daily", "weekly", "biweekly",
+                         "monthly", "quarterly", "yearly"];
+
+  function cachedSeries(metric) {
+    const hit = seriesCache.get(`${metric}|${granularity}`);
+    return (hit && Date.now() - hit.at < SERIES_TTL) ? hit.data : null;
+  }
+
+  async function loadSeries(metric) {
+    const key = `${metric}|${granularity}`;
+    try {
+      const res = await fetch(`/api/metrics/series?metric=${encodeURIComponent(metric)}`
+        + `&granularity=${encodeURIComponent(granularity)}`);
+      const data = await res.json();
+      if (data && !data.error) seriesCache.set(key, { at: Date.now(), data });
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // One render after every missing series lands, rather than one per fetch.
+  function wireTrends(metrics) {
+    const missing = metrics.filter((mid) => !cachedSeries(mid));
+    if (!missing.length) return;
+    Promise.all(missing.map(loadSeries)).then((results) => {
+      if (results.some((r) => r && !r.error) && typeof render === "function") render();
+    });
+  }
+
+  // A sparkline is the shape of the series, not its values — the number is beside
+  // it. Two points is the minimum that has a shape at all.
+  function sparkline(points) {
+    const vals = points.map((p) => p.value).filter((v) => v !== null);
+    if (vals.length < 2) return "";
+    const lo = Math.min(...vals);
+    const hi = Math.max(...vals);
+    const span = (hi - lo) || 1;
+    const w = 52, h = 13;
+    const d = vals.map((v, i) =>
+      `${((i / (vals.length - 1)) * w).toFixed(1)},${(h - ((v - lo) / span) * h).toFixed(1)}`
+    ).join(" ");
+    return `<svg class="lab-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"
+      aria-hidden="true"><polyline points="${d}"/></svg>`;
+  }
+
+  // The change since the previous reading, and whether that is the wrong way.
+  // The direction comes from the registry, so "worse" is derived rather than
+  // guessed — and a metric with no direction gets no judgement.
+  function deltaOf(points, direction) {
+    const vals = points.map((p) => p.value).filter((v) => v !== null);
+    if (vals.length < 2) return "";
+    const change = vals[vals.length - 1] - vals[vals.length - 2];
+    const shown = Math.abs(change) >= 100 ? Math.round(change)
+      : Math.abs(change) >= 1 ? Math.round(change * 10) / 10
+        : Math.round(change * 1000) / 1000;
+    if (!shown) return `<span class="lab-delta flat">0</span>`;
+    const worse = (direction === "lower" && change > 0)
+      || (direction === "higher" && change < 0);
+    return `<span class="lab-delta ${worse ? "worse" : "better"}">${
+      change > 0 ? "+" : ""}${shown}</span>`;
+  }
+
+  function trendCell(metric, subject, direction) {
+    const data = cachedSeries(metric);
+    if (!data) return `<span class="lab-spark-wait" title="loading"></span>`;
+    const points = data[subject];
+    if (!points || !points.length) return "";
+    return `<span class="lab-trend">${sparkline(points)}${deltaOf(points, direction)}</span>`;
+  }
+
   // The health metrics. A seat is "a problem" if any of them is above zero —
   // which is what the problems-only filter tests, and what the verdict ranks by.
   const PROBLEM_IDS = ["step_repetition", "premature_terminations",
@@ -304,8 +382,10 @@
       const s = r.seat;
       const cells = cols.map((c) => {
         const v = seatCell(m, c.id, s.role);
+        const slot = m[c.id] || {};
         return `<td class="num">${v === null ? `<span class="lab-dash">·</span>`
-          : esc(c.fmt(v))}${bar(v, maxima[c.id])}</td>`;
+          : esc(c.fmt(v))}${bar(v, maxima[c.id])}`
+          + `${trendCell(c.id, s.role, slot.direction)}</td>`;
       }).join("");
       const open = openSeat === s.role;
       const detail = open ? detailRow(m, s, cols) : "";
@@ -323,6 +403,9 @@
       : "";
 
     const controls = `<span class="lab-controls">
+      <select id="lab-gran" class="lab-gran" aria-label="time granularity">${
+        GRANULARITIES.map((g) => `<option value="${g}"${
+          g === granularity ? " selected" : ""}>${g}</option>`).join("")}</select>
       <button type="button" class="btn btn-sm" id="lab-cols">${
         allColumns ? "− fewer columns" : `+ ${MORE_COLS.length} columns`}</button>
       <label class="lab-toggle">
@@ -334,7 +417,9 @@
           ${cols.length} of ${COLS.length + MORE_COLS.length} columns</span>${controls}</div>
       <div class="tbl-wrap"><table class="tbl lab-tree">${head}${body}</table></div>
       ${foot}
-      <p class="lab-foot">Click a seat for every reading it holds.</p>`;
+      <p class="lab-foot">Click a seat for every reading it holds. The line under a
+        number is its shape at the selected granularity; the arrow is the change
+        since the previous reading.</p>`;
   }
 
   function detailRow(m, seat, cols) {
@@ -377,6 +462,13 @@
     if (cols) {
       cols.addEventListener("click", () => {
         allColumns = !allColumns;
+        if (typeof render === "function") render();
+      });
+    }
+    const gran = document.getElementById("lab-gran");
+    if (gran) {
+      gran.addEventListener("change", () => {
+        granularity = gran.value;
         if (typeof render === "function") render();
       });
     }
@@ -470,7 +562,11 @@
         computes it in concentric/metrics.py; restart the server if this page is
         empty after an update.</span>`);
     }
-    setTimeout(() => { wireBatch(); wireDept(); }, 0);
+    // After the DOM swaps in: the listeners, and the series the visible columns
+    // need. Only the columns on screen are fetched — a hidden column costs
+    // nothing until it is shown.
+    const visible = (allColumns ? COLS.concat(MORE_COLS) : COLS).map((c) => c.id);
+    setTimeout(() => { wireBatch(); wireDept(); wireTrends(visible); }, 0);
     return verdict(m, d)
       + batchBar(d)
       + summaryLine(rows)

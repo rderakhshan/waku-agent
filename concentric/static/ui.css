@@ -780,3 +780,20 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .lab-gap-box{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-faint)}
 .lab-gap-row code{font-family:var(--face-mono);font-size:var(--text-xs);min-width:22ch}
 .lab-foot{font-size:var(--text-xs);color:var(--text-faint);margin:var(--space-2) 0 0}
+
+/* ---- the trend under each number.
+   The sparkline is the shape and the arrow is the change; the number itself is
+   above them, so neither has to be read precisely. */
+.lab-trend{display:block;margin-top:2px;line-height:1}
+.lab-spark{display:block;margin:0 0 0 auto;overflow:visible}
+.lab-spark polyline{fill:none;stroke:var(--text-faint);stroke-width:1.2;
+  stroke-linejoin:round;stroke-linecap:round}
+.lab-spark-wait{display:block;height:13px}
+.lab-delta{display:block;font-family:var(--face-mono);font-size:10px;margin-top:1px}
+.lab-delta.flat{color:var(--text-faint)}
+.lab-delta.worse{color:var(--bad,#b3261e)}
+.lab-delta.better{color:var(--ok,#1f7a3f)}
+.lab-gran{font-family:var(--face-mono);font-size:var(--text-xs);
+  background:var(--surface-paper);color:var(--text-ink);
+  border:var(--rule-width) solid var(--rule);border-radius:var(--radius-sm,4px);
+  padding:2px 4px}
