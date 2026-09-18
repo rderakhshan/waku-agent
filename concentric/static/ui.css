@@ -732,12 +732,16 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .lab-dept-head{display:flex;align-items:baseline;gap:var(--space-3);
   margin:var(--space-6) 0 var(--space-3)}
 .lab-dept-head h2{margin:0}
-.lab-toggle{margin-left:auto;display:flex;align-items:center;gap:6px;
+.lab-toggle{display:flex;align-items:center;gap:6px;
   font-size:var(--text-sm);color:var(--text-faint);cursor:pointer;user-select:none}
+.lab-controls{margin-left:auto;display:flex;align-items:center;gap:var(--space-3)}
 
 /* The org tree. Indentation is the ring, so the layout is the department. */
 .lab-tree th,.lab-tree td{padding:5px 10px 5px 0}
 .lab-tree th.num,.lab-tree td.num{text-align:right;font-variant-numeric:tabular-nums}
+/* A seat name is one line, however many columns are showing. Without this the
+   wide table squeezes the first column and "cfo-1-development" wraps. */
+.lab-tree th,.lab-tree td:first-child{white-space:nowrap}
 .lab-indent{display:inline-block;width:calc(var(--d, 0) * 15px)}
 .lab-seat{cursor:pointer}
 .lab-seat:hover{background:var(--surface-raised)}

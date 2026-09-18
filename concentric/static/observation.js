@@ -20,6 +20,7 @@
   let batchRunning = false;
   let batchText = "";
   let problemsOnly = false;
+  let allColumns = false;
   let openSeat = null;
 
   // The health metrics. A seat is "a problem" if any of them is above zero —
@@ -83,6 +84,8 @@
   const usd = (n) => "$" + Number(n).toFixed(3);
   const secs = (n) => (n >= 1000 ? (n / 1000).toFixed(1) + "s" : Math.round(n) + "ms");
   const plain = (n) => String(n);
+  const compact = (n) => (n >= 1e6 ? (n / 1e6).toFixed(1) + "M"
+    : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(n));
 
   function ago(iso) {
     if (!iso) return "never";
@@ -232,6 +235,23 @@
     { id: "step_repetition", label: "repeats", fmt: plain },
   ];
 
+  // The rest, behind a toggle. Four columns is what a reader scans; seventeen is
+  // what they consult. Hiding the second set is not hiding information — it is
+  // ordering it, and the toggle says how much is behind it.
+  const MORE_COLS = [
+    { id: "latency_p95", label: "p95", fmt: secs },
+    { id: "throughput", label: "thru", fmt: (n) => Number(n).toFixed(2) },
+    { id: "tokens_in", label: "tok in", fmt: compact },
+    { id: "tokens_out", label: "tok out", fmt: compact },
+    { id: "premature_terminations", label: "stops", fmt: plain },
+    { id: "mandate_breaches", label: "scope", fmt: plain },
+    { id: "memory_growth", label: "memory", fmt: plain },
+    { id: "stance_shift", label: "shift", fmt: (n) => Number(n).toFixed(3) },
+    { id: "average_reward", label: "reward", fmt: (n) => Number(n).toFixed(2) },
+    { id: "factual_grounding", label: "ground", fmt: (n) => Number(n).toFixed(2) },
+    { id: "hallucination_rate", label: "halluc", fmt: (n) => Number(n).toFixed(2) },
+  ];
+
   function treeOrder(seats) {
     const byParent = {};
     seats.forEach((s) => {
@@ -253,6 +273,7 @@
     const seats = (d.department && d.department.seats) || [];
     if (!seats.length) return "";
     const ordered = treeOrder(seats);
+    const cols = allColumns ? COLS.concat(MORE_COLS) : COLS;
 
     // With the filter on, keep the problem seats AND their ancestors — a tree
     // that drops the parent leaves an orphan with no owner.
@@ -271,23 +292,23 @@
     // One scale per column, taken from the full roster rather than the shown
     // rows, so a bar does not grow just because the filter hid its neighbours.
     const maxima = {};
-    COLS.forEach((c) => {
+    cols.forEach((c) => {
       maxima[c.id] = Math.max(0, ...ordered.map((r) => seatCell(m, c.id, r.seat.role) || 0));
     });
 
     const head = `<tr><th>seat</th><th class="num">n</th>`
-      + COLS.map((c) => `<th class="num">${esc(c.label)}</th>`).join("")
+      + cols.map((c) => `<th class="num">${esc(c.label)}</th>`).join("")
       + `</tr>`;
 
     const body = shown.map((r) => {
       const s = r.seat;
-      const cells = COLS.map((c) => {
+      const cells = cols.map((c) => {
         const v = seatCell(m, c.id, s.role);
         return `<td class="num">${v === null ? `<span class="lab-dash">·</span>`
           : esc(c.fmt(v))}${bar(v, maxima[c.id])}</td>`;
       }).join("");
       const open = openSeat === s.role;
-      const detail = open ? detailRow(m, s) : "";
+      const detail = open ? detailRow(m, s, cols) : "";
       return `<tr class="lab-seat${open ? " open" : ""}" data-seat="${esc(s.role)}">
           <td><span class="lab-indent" style="--d:${r.depth}"></span>
             <code>${esc(s.role)}</code></td>
@@ -301,20 +322,29 @@
          they have nothing in the health columns.</p>`
       : "";
 
-    const toggle = `<label class="lab-toggle">
-      <input type="checkbox" id="lab-problems"${problemsOnly ? " checked" : ""}>
-      problems only</label>`;
+    const controls = `<span class="lab-controls">
+      <button type="button" class="btn btn-sm" id="lab-cols">${
+        allColumns ? "− fewer columns" : `+ ${MORE_COLS.length} columns`}</button>
+      <label class="lab-toggle">
+        <input type="checkbox" id="lab-problems"${problemsOnly ? " checked" : ""}>
+        problems only</label></span>`;
 
     return `<div class="lab-dept-head"><h2>The department</h2>
-        <span class="meta">${shown.length} of ${ordered.length} shown</span>${toggle}</div>
+        <span class="meta">${shown.length} of ${ordered.length} shown ·
+          ${cols.length} of ${COLS.length + MORE_COLS.length} columns</span>${controls}</div>
       <div class="tbl-wrap"><table class="tbl lab-tree">${head}${body}</table></div>
       ${foot}
-      <p class="lab-foot">Click a seat for its full readings.</p>`;
+      <p class="lab-foot">Click a seat for every reading it holds.</p>`;
   }
 
-  function detailRow(m, seat) {
+  function detailRow(m, seat, cols) {
+    const shownIds = new Set(cols.map((c) => c.id));
     const rows = Object.values(m)
       .map((slot) => {
+        // Only the ones the table is not already showing. The rest are a click
+        // away, and repeating them here would make the detail longer than the
+        // table it belongs to.
+        if (shownIds.has(slot.id)) return null;
         const v = seatCell(m, slot.id, seat.role);
         if (v === null) return null;
         return `<div class="lab-detail-row">
@@ -323,8 +353,9 @@
             <span class="meta">${esc(slot.unit)}</span></span></div>`;
       })
       .filter(Boolean).join("");
-    return `<tr class="lab-detail"><td colspan="${COLS.length + 2}">${rows
-      || `<span class="meta">no per-seat readings for this seat yet</span>`}</td></tr>`;
+    return `<tr class="lab-detail"><td colspan="${cols.length + 2}">${rows
+      || `<span class="meta">every reading this seat holds is already a column —
+          widen the table to see the rest</span>`}</td></tr>`;
   }
 
   function show(v) {
@@ -339,6 +370,13 @@
     if (box) {
       box.addEventListener("change", () => {
         problemsOnly = box.checked;
+        if (typeof render === "function") render();
+      });
+    }
+    const cols = document.getElementById("lab-cols");
+    if (cols) {
+      cols.addEventListener("click", () => {
+        allColumns = !allColumns;
         if (typeof render === "function") render();
       });
     }
