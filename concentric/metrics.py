@@ -850,14 +850,19 @@ Reply with ONLY this JSON, no prose:
 """
 
 
-def _grounding_values(events: list[dict]) -> dict:
+def _grounding_values(turns: list[list[dict]]) -> dict:
     """Hallucination rate and factual grounding: one question, scored two ways.
 
     Both read the trace and nothing else. The tools block is what the agent
     actually saw, so a claim that is not in it came from somewhere other than
     the work — which is the whole definition of an ungrounded reply.
+
+    Takes the turns to score rather than the whole corpus, so the caller's limit
+    bounds this pass the same way it bounds the other two. It used to take every
+    event, which made a run get more expensive as the corpus grew: twenty sampled
+    turns, forty fixed agreement calls, and a grounding pass that grew without
+    bound.
     """
-    turns = [t for t in _turns_of(events) if len(t) > 1]
     scored = grounded = 0
     for turn in turns:
         tools = [(ev.get("output") or "").strip() for ev in turn
@@ -962,8 +967,11 @@ TURN:
 
 
 def run(limit: int = 20) -> dict:
-    """Score the most recent turns and write the report. This is the only
-    function here that spends money, and it never runs from the dashboard."""
+    """Score the most recent `limit` turns and write the report.
+
+    The limit bounds every pass. This is the only function here that spends
+    money, and it never runs from the dashboard.
+    """
     ctx = context()
     turns = [t for t in _turns_of(ctx.get("events") or []) if len(t) > 1]
     sample = turns[-limit:]
@@ -988,7 +996,7 @@ def run(limit: int = 20) -> dict:
     # The semantic and reference metrics need the same turn data, so they ride
     # the same run rather than each paying for their own pass over the corpus.
     events = ctx.get("events") or []
-    values.update(_grounding_values(events))
+    values.update(_grounding_values(sample))
     values.update(_agreement_values(events, sample))
     values.update(_semantic_values(events))
     values.update(_reference_values(events))
@@ -1053,6 +1061,24 @@ def _read_json(path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+
+
+def _report_from(name: str) -> dict:
+    """A report, from Irina's home or from the default one.
+
+    The gate and the test hook resolve their own home from WAKU_HOME. The
+    launcher sets that in-process, but a plain `make gate` in a terminal does
+    not, so a report written by hand lands in `.waku/` while this module reads
+    Irina's. Both are looked at rather than making the reader remember to export
+    a variable before running a command.
+    """
+    from pathlib import Path
+
+    for folder in (tool_report_path(ensure=False).parent, Path(".waku")):
+        path = folder / name
+        if path.exists():
+            return _read_json(path)
+    return {}
 
 
 def _tool_accuracy(report: dict) -> float | None:
@@ -1247,9 +1273,9 @@ def context() -> dict:
         "facts": data.get("facts") or [],
         "episodes": data.get("episodes") or [],
         "chat_pending": data.get("chat_pending") or 0,
-        "eval_report": data.get("eval_report"),
+        "eval_report": data.get("eval_report") or _report_from("eval_report.json"),
         "report": load_report(),
-        "tool_report": _read_json(tool_report_path()),
+        "tool_report": _report_from("tool_report.json"),
         "arena_runs": load_runs(settings.home),
         "arena_spec": f"{settings.provider}:{settings.model}",
     }

@@ -254,7 +254,7 @@ def _grounding_events() -> list[dict]:
 def test_grounding_is_scored_two_ways_from_one_judgement(monkeypatch):
     replies = iter(['{"grounded": 1}', '{"grounded": 0}'])
     monkeypatch.setattr(metrics, "_ask", lambda p, max_tokens=700: next(replies))
-    values = metrics._grounding_values(_grounding_events())
+    values = metrics._grounding_values(metrics._turns_of(_grounding_events()))
     assert values["factual_grounding"] == 0.5
     assert values["hallucination_rate"] == 0.5
 
@@ -262,7 +262,20 @@ def test_grounding_is_scored_two_ways_from_one_judgement(monkeypatch):
 def test_a_judge_that_cannot_answer_is_no_measurement(monkeypatch):
     monkeypatch.setattr(metrics, "_ask",
                         lambda p, max_tokens=700: "I am unable to help with that")
-    assert metrics._grounding_values(_grounding_events()) == {}
+    assert metrics._grounding_values(metrics._turns_of(_grounding_events())) == {}
+
+
+def test_the_run_limit_bounds_the_grounding_pass(monkeypatch):
+    """The limit has to bound every pass, not just the sampled ones. It used to
+    score grounding over the whole corpus, so a run got more expensive as the
+    trace grew while the other two passes stayed at the limit."""
+    seen = []
+    monkeypatch.setattr(metrics, "_ask",
+                        lambda p, max_tokens=700: seen.append(1) or '{"grounded": 1}')
+    turns = metrics._turns_of(_grounding_events())
+    assert len(turns) == 2
+    metrics._grounding_values(turns[:1])
+    assert len(seen) == 1, "grounding scored more turns than it was given"
 
 
 def test_kappa_is_one_when_two_labelers_agree_on_a_varied_set():
