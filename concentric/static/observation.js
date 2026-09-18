@@ -1,83 +1,88 @@
-// ---- Observation Lab: the instruments, and the gaps.
+// ---- Observation Lab.
 //
-// Every other page answers "what is it doing now". This one answers "what can we
-// say about it at all" — including the things we cannot say yet. The registry
-// behind it is `concentric/metrics.py`, and each slot's state is a fact rather
-// than a wish: a metric with no value names what would give it one.
+// Four questions, four sections, and the numbers are one click deeper than the
+// answers. Every other page in this dashboard says what the department is doing;
+// this one says which part of it is the problem.
 //
-// The page never calls a model. Everything on it is arithmetic over traces and
-// state already on disk, which is why it can ride the 5s poll. Anything that
-// needs a judge is a batch run, and shows up here as a number with a last-run
-// stamp or as a named gap.
+// The shape follows from two observations about how a reader actually uses it:
+//
+//   * The thing they want first is ONE seat to look at, not a list of findings.
+//   * The thing they want second is WHOSE problem it is — and the department
+//     already knows, because the roster carries a parent for every seat.
+//
+// So the main table is the org tree, not a flat list, and the outlier finds the
+// reader through a bar rather than through arithmetic. Nothing is computed here
+// that the registry did not already compute; this file only decides what to show
+// first.
 (function () {
   "use strict";
 
-  // The lenses are the questions, not the taxonomy's sections. Flow, Effort,
-  // Health and Memory came out of reading the first catalogue: those are the
-  // four ways the same trace and state answer four different things.
-  const LENSES = [
-    ["Health", "How it fails, and whether it holds together", [
-      "premature_terminations", "unanswered_handoffs", "step_repetition",
-      "mandate_breaches", "hallucination_rate",
-      "mast_reasoning_action_mismatch", "mast_information_withholding",
-      "mast_annotator_agreement",
-      "stance_convergence", "stance_shift", "semantic_diversity"]],
-    ["Effort", "Where the time and money go", [
-      "cost", "cost_per_ring", "latency_avg", "latency_p95", "throughput",
-      "tokens_in", "tokens_out", "context_growth", "tool_errors"]],
-    ["Flow", "How work moves", [
-      "delegation_depth", "delegation_breadth", "handoff_latency",
-      "consultations", "peer_pairs_used", "gate_retrieval_ratio"]],
-    ["Memory", "What the ecosystem learns", [
-      "memory_growth", "fact_writers", "seats_without_memory", "idle_seats",
-      "consolidation_backlog", "context_retention", "factual_grounding",
-      "bleu_rouge_meteor", "bertscore"]],
-  ];
-
-  // Health is the one lens whose numbers are all bad news when they are high, so
-  // it is the one that raises a flag rather than a row.
-  const WATCH = ["premature_terminations", "unanswered_handoffs", "step_repetition",
-                 "mandate_breaches"];
-
-  function show(v) {
-    if (v === null || v === undefined) return "—";
-    if (typeof v === "number") return String(Math.round(v * 10000) / 10000);
-    if (Array.isArray(v)) {
-      const head = v.slice(0, 3).join(", ");
-      return v.length > 3 ? `${head} +${v.length - 3} more` : head;
-    }
-    if (typeof v === "object") {
-      return Object.entries(v).slice(0, 3)
-        .map(([k, x]) => `${k}: ${x}`).join(", ");
-    }
-    return String(v);
-  }
-
-  // A wired slot with no value is not the same as a slot nobody wired. The badge
-  // says which, because that is the difference between "nothing happened yet"
-  // and "nobody is looking".
-  function stateBadge(slot) {
-    if (slot.value !== null) return uiBadge("measured", "ok");
-    if (slot.state === "computed") return uiBadge("no data yet", "warn");
-    if (slot.state === "ready") return uiBadge("ready", "warn");
-    if (slot.state === "blocked") return uiBadge("blocked", "bad");
-    return uiBadge("planned", "neutral");
-  }
-
-  // ---- the run button.
-  //
-  // The only control on this page that spends money. Three rules, all of them
-  // about the reader being able to decide rather than discover:
-  //
-  //   * it says what the run will cost before it is pressed
-  //   * it refuses to start a second run while one is going
-  //   * it refreshes the view the moment the numbers land, rather than leaving
-  //     the reader waiting up to five seconds for the next poll
-  //
-  // Nothing here runs on a timer. The batch is a decision, not a background job.
-
   let batchRunning = false;
   let batchText = "";
+  let problemsOnly = false;
+  let openSeat = null;
+
+  // The health metrics. A seat is "a problem" if any of them is above zero —
+  // which is what the problems-only filter tests, and what the verdict ranks by.
+  const PROBLEM_IDS = ["step_repetition", "premature_terminations",
+                       "tool_errors", "mandate_breaches"];
+
+  // --- reading the registry ---------------------------------------------------
+
+  function cellOf(slot, key) {
+    const value = slot && slot.value;
+    if (!value || typeof value !== "object") return null;
+    const cell = value[key];
+    if (cell === null || cell === undefined) return null;
+    return (typeof cell === "object") ? cell.value : cell;
+  }
+
+  function seatCell(m, id, role) {
+    return cellOf(m[id], role);
+  }
+
+  function totalOf(slot) {
+    const value = slot && slot.value;
+    if (value === null || value === undefined) return null;
+    if (typeof value !== "object") return value;
+    return Object.values(value).reduce(
+      (n, cell) => n + ((cell && typeof cell === "object") ? cell.value : cell || 0), 0);
+  }
+
+  // A seat's sample size, taken as the largest of the metrics that count things
+  // it did. It travels with every row because a seat with two turns and a seat
+  // with forty are not comparable, and the page must not imply they are.
+  function seatN(m, role) {
+    let best = null;
+    for (const id of ["tokens_in", "cost", "tool_errors", "step_repetition"]) {
+      const value = m[id] && m[id].value;
+      const cell = value && value[role];
+      const n = (cell && typeof cell === "object") ? cell.n : null;
+      if (typeof n === "number") best = (best === null) ? n : Math.max(best, n);
+    }
+    return best;
+  }
+
+  function isProblem(m, role) {
+    return PROBLEM_IDS.some((id) => (seatCell(m, id, role) || 0) > 0);
+  }
+
+  // The worst row of a metric, and how big it is — "data-steward · 15".
+  function worstOf(slot) {
+    const value = slot && slot.value;
+    if (!value || typeof value !== "object") return null;
+    const rows = Object.entries(value)
+      .map(([key, cell]) => ({ key, n: (cell && typeof cell === "object") ? cell.value : cell }))
+      .filter((r) => typeof r.n === "number" && r.n > 0)
+      .sort((a, b) => b.n - a.n);
+    return rows.length ? rows[0] : null;
+  }
+
+  // --- formatting -------------------------------------------------------------
+
+  const usd = (n) => "$" + Number(n).toFixed(3);
+  const secs = (n) => (n >= 1000 ? (n / 1000).toFixed(1) + "s" : Math.round(n) + "ms");
+  const plain = (n) => String(n);
 
   function ago(iso) {
     if (!iso) return "never";
@@ -90,6 +95,53 @@
     return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
   }
 
+  // A bar is a fraction of the column's largest value, so the eye finds the
+  // outlier without reading a single number. Trivial to draw and it does more
+  // work than any amount of sorting.
+  function bar(value, max) {
+    if (value === null || !max) return "";
+    const width = Math.round(Math.max(0, Math.min(1, value / max)) * 100);
+    return `<span class="lab-bar"><i style="width:${width}%"></i></span>`;
+  }
+
+  // --- the verdict ------------------------------------------------------------
+  //
+  // One seat, not a list. A reader does one thing with a verdict, and it is not
+  // reading three findings and deciding which matters.
+
+  function verdict(m, d) {
+    const ranked = PROBLEM_IDS
+      .map((id) => ({ id, slot: m[id], worst: worstOf(m[id]) }))
+      .filter((x) => x.worst)
+      .sort((a, b) => b.worst.n - a.worst.n);
+
+    if (!ranked.length) {
+      return uiCard(`<p class="lab-verdict">Nothing in the health instruments is
+        above zero. No seat is repeating itself, stopping early, or breaking
+        scope.</p>`);
+    }
+
+    const top = ranked[0];
+    const seat = top.worst.key;
+    const share = totalOf(top.slot);
+    const rest = ranked.slice(1)
+      .map((x) => `${x.slot.label.toLowerCase()} ${totalOf(x.slot)}`);
+
+    const tail = rest.length
+      ? ` The rest of the department: ${rest.join(", ")}.`
+      : "";
+    const owner = (d.department && d.department.seats || [])
+      .find((s) => s.role === seat);
+    const ownerText = (owner && owner.parent)
+      ? `, who sits under ${owner.parent}` : "";
+
+    return uiCard(`<p class="lab-verdict"><b>${esc(seat)}</b> is the one to look
+      at: ${top.worst.n} of the department's ${share}
+      ${esc(top.slot.unit)}${ownerText}.${tail}</p>`);
+  }
+
+  // --- the batch bar ----------------------------------------------------------
+
   function batchBar(d) {
     const b = d.batch || {};
     const limit = b.limit || 20;
@@ -97,7 +149,7 @@
     const note = b.embeddings ? ""
       : " The four semantic metrics stay empty: no OPENAI_API_KEY is set.";
     return `<div class="lab-batch">
-      <div class="lab-batch-txt"><b>Last batch run:</b> ${esc(ago(b.last_run))}.
+      <div class="lab-batch-txt"><b>Last run:</b> ${esc(ago(b.last_run))}.
         The next one scores the last ${esc(limit)} turns for ${esc(cost)}.${note}</div>
       <button type="button" class="btn btn-primary lab-run" id="lab-run">Run the batch</button>
       <div class="lab-progress" id="lab-progress" hidden></div>
@@ -107,20 +159,17 @@
   function wireBatch() {
     const btn = document.getElementById("lab-run");
     if (!btn) return;
-    const bar = document.getElementById("lab-progress");
-    // The view is rebuilt on every poll, so a run in flight has to be restored
-    // rather than forgotten: the button comes back enabled otherwise, and a
-    // second press would be refused by the server after the click.
+    const barEl = document.getElementById("lab-progress");
     if (batchRunning) {
       btn.disabled = true;
-      if (bar) { bar.hidden = false; bar.textContent = batchText; }
+      if (barEl) { barEl.hidden = false; barEl.textContent = batchText; }
     }
     btn.addEventListener("click", async () => {
       if (batchRunning) return;
       batchRunning = true;
       batchText = "starting…";
       btn.disabled = true;
-      if (bar) { bar.hidden = false; bar.textContent = batchText; }
+      if (barEl) { barEl.hidden = false; barEl.textContent = batchText; }
       try {
         const res = await fetch("/api/metrics/run", { method: "POST" });
         const reader = res.body.getReader();
@@ -140,167 +189,240 @@
             if (ev.kind === "start") batchText = `running · 0 of ${ev.calls}`;
             else if (ev.kind === "progress") batchText = `running · ${ev.done} of ${ev.of}`;
             else if (ev.kind === "error") batchText = `stopped: ${ev.message}`;
-            else if (ev.kind === "done") batchText = `done · ${ev.scored} turns scored`;
-            if (bar) bar.textContent = batchText;
+            else if (ev.kind === "done") batchText = `done · ${ev.scored} answers scored`;
+            if (barEl) barEl.textContent = batchText;
           }
         }
       } catch (e) {
         batchText = `the run failed: ${e}`;
-        if (bar) { bar.hidden = false; bar.textContent = batchText; }
+        if (barEl) { barEl.hidden = false; barEl.textContent = batchText; }
       }
       batchRunning = false;
       btn.disabled = false;
-      // main.js's own refresh, so the new report shows up now rather than at the
-      // next poll.
       if (typeof refresh === "function") refresh();
     });
   }
 
-  // A per-seat value is a dict; the department-level sentences need one number.
-  // The tables stay per-seat — only the verdict and the watch list collapse.
-  function totalOf(slot) {
-    const v = slot && slot.value;
-    if (v === null || v === undefined) return null;
-    if (typeof v !== "object") return v;
-    return Object.values(v).reduce((n, cell) => n + ((cell && cell.value) || 0), 0);
-  }
-
-  function verdict(m, d) {
-    const turns = (d.stats && d.stats.turns) || 0;
-    const val = (id) => totalOf(m[id]);
-    const parts = [];
-    const stopped = val("premature_terminations");
-    const silent = val("unanswered_handoffs");
-    const repeated = val("step_repetition");
-    if (stopped !== null && turns) parts.push(`${stopped} of ${turns} turns never finished`);
-    if (silent) parts.push(`${silent} hand-offs were never answered`);
-    if (repeated) parts.push(`${repeated} tool calls repeated inside a turn`);
-    const lede = parts.length
-      ? `Health reads first, because it is the only lens where a number is bad news: ${parts.join("; ")}.`
-      : "Health reads clean: no turn stopped early, no hand-off went unanswered, nothing repeated.";
-    // Naming the worst seat here, where a reader stops first, rather than making
-    // them scroll to the tables to find out who it is.
-    const worst = WATCH
-      .map((id) => (m[id] && worstOf(m[id]) ? `${m[id].label}: ${worstOf(m[id])}` : ""))
-      .filter(Boolean);
-    const where = worst.length ? ` The worst single case is ${worst[0]}.` : "";
-    return uiCard(`<p class="lab-verdict">${lede}${where}</p>`);
-  }
-
-  // The worst row of a per-seat or per-pair value — "audit-planner 9". The
-  // department count says something is wrong; this says where to look, which is
-  // the only actionable half.
-  function worstOf(slot) {
-    const v = slot && slot.value;
-    if (!v || typeof v !== "object") return "";
-    const rows = Object.entries(v)
-      .map(([key, cell]) => ({
-        key, n: (cell && typeof cell === "object") ? cell.value : cell,
-      }))
-      .filter((r) => typeof r.n === "number" && r.n > 0);
-    if (!rows.length) return "";
-    rows.sort((a, b) => b.n - a.n);
-    return `${rows[0].key} · ${rows[0].n}`;
-  }
-
-  function attention(m, rows) {
-    const flagged = WATCH
-      .map((id) => ({ slot: m[id], total: totalOf(m[id]) }))
-      .filter((x) => x.slot && typeof x.total === "number" && x.total > 0);
-    const gaps = rows.filter((s) => s.value === null && s.state !== "placeholder");
-    const body = [];
-    if (flagged.length) {
-      body.push(table(["what", "count", "worst", "unit"], flagged.map((x) => [
-        `<b>${esc(x.slot.label)}</b>`, `<code>${show(x.total)}</code>`,
-        `<code>${esc(worstOf(x.slot))}</code>`,
-        `<span class="meta">${esc(x.slot.unit)}</span>`])));
-    } else {
-      body.push(`<p class="lab-quiet">Nothing in the health instruments is above zero.</p>`);
-    }
-    if (gaps.length) {
-      body.push(`<p class="lab-gap">${gaps.length} instruments have no value yet. `
-        + `They are listed with what would fill them under Instruments.</p>`);
-    }
-    return uiCard(body.join(""), { title: "Needs attention" });
-  }
-
-  // A per-seat or per-pair value renders as a table, not one number. Sorted
-  // worst-first, because that is the entire reason for splitting a department
-  // mean back into its seats: "23 repeats" becomes "audit-planner repeated 9".
+  // --- the summary line -------------------------------------------------------
   //
-  // `n` rides every row. A mean over two turns and a mean over forty are not the
-  // same claim, and showing them side by side without saying so invites a wrong
-  // conclusion.
-  function seriesTable(value, direction, unit) {
-    const rows = Object.entries(value).map(([key, cell]) => {
-      const isCell = cell && typeof cell === "object";
-      return { key, v: isCell ? cell.value : cell, n: isCell ? cell.n : null };
+  // The stat band was five boxes for five counts. One line reads faster and the
+  // counts are not the point — what is missing is.
+
+  function summaryLine(rows) {
+    const has = (s) => rows.filter((r) => r.value !== null && r.state === s).length;
+    const waiting = rows.filter((r) => r.value === null && r.state === "computed").length;
+    const ready = rows.filter((r) => r.value === null && r.state === "ready").length;
+    const planned = rows.filter((r) => r.value === null && r.state === "placeholder").length;
+    return `<p class="lab-summary">${rows.length} instruments ·
+      <b>${has("computed")}</b> measured ·
+      ${waiting} waiting on a run · ${ready} ready to build · ${planned} planned</p>`;
+  }
+
+  // --- the department tree ----------------------------------------------------
+  //
+  // The roster carries a parent for every seat, so the table can be the org
+  // chart. That does something a sorted list cannot: it shows whose problem a
+  // problem is. A worker looping is its CFO's problem, and the indentation says
+  // so without a word of copy.
+
+  const COLS = [
+    { id: "cost", label: "cost", fmt: usd },
+    { id: "latency_avg", label: "latency", fmt: secs },
+    { id: "tool_errors", label: "errors", fmt: plain },
+    { id: "step_repetition", label: "repeats", fmt: plain },
+  ];
+
+  function treeOrder(seats) {
+    const byParent = {};
+    seats.forEach((s) => {
+      const key = s.parent || "";
+      (byParent[key] = byParent[key] || []).push(s);
     });
-    if (!rows.length) return `<span class="meta">nothing to show</span>`;
-    const num = (x) => (typeof x === "number" ? x : Number(x));
-    if (direction === "lower") rows.sort((a, b) => num(b.v) - num(a.v));
-    else if (direction === "higher") rows.sort((a, b) => num(a.v) - num(b.v));
-    else rows.sort((a, b) => String(a.key).localeCompare(String(b.key)));
-    const body = rows.map((r) => `<tr>
-      <td><code>${esc(r.key)}</code></td>
-      <td class="num"><code>${esc(show(r.v))}</code></td>
-      <td class="meta">${r.n == null ? "" : "n=" + esc(r.n)}</td></tr>`).join("");
-    return `<table class="lab-series"><thead><tr>
-      <th>who</th><th>${esc(unit || "")}</th><th></th></tr></thead>
-      <tbody>${body}</tbody></table>`;
+    const out = [];
+    const walk = (parent, depth) => {
+      (byParent[parent] || []).forEach((s) => {
+        out.push({ seat: s, depth });
+        walk(s.role, depth + 1);
+      });
+    };
+    walk("", 0);
+    return out;
   }
 
-  function valueCell(s) {
-    if (s.value === null || s.value === undefined) {
-      return `<code>—</code> <span class="lab-row-unit">${esc(s.unit)}</span>`;
+  function departmentTable(d, m) {
+    const seats = (d.department && d.department.seats) || [];
+    if (!seats.length) return "";
+    const ordered = treeOrder(seats);
+
+    // With the filter on, keep the problem seats AND their ancestors — a tree
+    // that drops the parent leaves an orphan with no owner.
+    const problems = new Set(ordered.filter((r) => isProblem(m, r.seat.role))
+      .map((r) => r.seat.role));
+    const keep = new Set(problems);
+    if (problemsOnly) {
+      const parentOf = {};
+      seats.forEach((s) => { parentOf[s.role] = s.parent; });
+      problems.forEach((role) => {
+        for (let p = parentOf[role]; p; p = parentOf[p]) keep.add(p);
+      });
     }
-    if (typeof s.value === "object") {
-      return seriesTable(s.value, s.direction, s.unit);
-    }
-    return `<code>${esc(show(s.value))}</code>
-      <span class="lab-row-unit">${esc(s.unit)}</span>
-      ${s.as_of ? `<span class="lab-row-asof">run ${esc(ago(s.as_of))}</span>` : ""}`;
-  }
+    const shown = problemsOnly ? ordered.filter((r) => keep.has(r.seat.role)) : ordered;
 
-  function lensCard([name, question, ids], m) {
-    const slots = ids.map((id) => m[id]).filter(Boolean);
-    if (!slots.length) return "";
-    const body = slots.map((s) => `<div class="lab-row">
-        <div class="lab-row-head">
-          <span class="lab-row-label">${esc(s.label)}</span>
-          ${stateBadge(s)}
-        </div>
-        <div class="lab-row-value">${valueCell(s)}</div>
-        ${s.value === null && s.filler
-          ? `<div class="lab-row-filler">${esc(s.filler)}</div>` : ""}
-      </div>`).join("");
-    return uiCard(body, { title: `${name} — ${question}` });
-  }
+    // One scale per column, taken from the full roster rather than the shown
+    // rows, so a bar does not grow just because the filter hid its neighbours.
+    const maxima = {};
+    COLS.forEach((c) => {
+      maxima[c.id] = Math.max(0, ...ordered.map((r) => seatCell(m, c.id, r.seat.role) || 0));
+    });
 
-  function instruments(rows) {
-    const groups = [
-      ["measured", rows.filter((s) => s.value !== null)],
-      ["wired, no data yet",
-       rows.filter((s) => s.value === null && s.state === "computed")],
-      ["ready to build", rows.filter((s) => s.value === null && s.state === "ready")],
-      ["blocked", rows.filter((s) => s.value === null && s.state === "blocked")],
-      ["planned", rows.filter((s) => s.value === null && s.state === "placeholder")],
-    ];
-    return groups.filter(([, g]) => g.length).map(([title, group]) => {
-      const body = group.map((s) => [
-        `<code>${esc(s.id)}</code><div class="meta">${esc(s.label)} · ${esc(s.level)}</div>`,
-        valueCell(s),
-        stateBadge(s),
-        `<span class="meta">${esc(s.unit)} · ${esc(s.changes)} · `
-        + `${esc(s.source)}</span>`,
-        s.value === null && s.filler
-          ? `<span class="meta">${esc(s.filler)}</span>` : "",
-      ]);
-      return uiCard(
-        table(["instrument", "value", "state", "", "what would fill it"], body),
-        { title: `${title} — ${group.length}` });
+    const head = `<tr><th>seat</th><th class="num">n</th>`
+      + COLS.map((c) => `<th class="num">${esc(c.label)}</th>`).join("")
+      + `</tr>`;
+
+    const body = shown.map((r) => {
+      const s = r.seat;
+      const cells = COLS.map((c) => {
+        const v = seatCell(m, c.id, s.role);
+        return `<td class="num">${v === null ? `<span class="lab-dash">·</span>`
+          : esc(c.fmt(v))}${bar(v, maxima[c.id])}</td>`;
+      }).join("");
+      const open = openSeat === s.role;
+      const detail = open ? detailRow(m, s) : "";
+      return `<tr class="lab-seat${open ? " open" : ""}" data-seat="${esc(s.role)}">
+          <td><span class="lab-indent" style="--d:${r.depth}"></span>
+            <code>${esc(s.role)}</code></td>
+          <td class="num"><span class="meta">${esc(seatN(m, s.role) || "·")}</span></td>
+          ${cells}</tr>${detail}`;
     }).join("");
+
+    const hidden = ordered.length - shown.length;
+    const foot = problemsOnly && hidden
+      ? `<p class="lab-foot">${hidden} more seat${hidden === 1 ? "" : "s"} hidden —
+         they have nothing in the health columns.</p>`
+      : "";
+
+    const toggle = `<label class="lab-toggle">
+      <input type="checkbox" id="lab-problems"${problemsOnly ? " checked" : ""}>
+      problems only</label>`;
+
+    return `<div class="lab-dept-head"><h2>The department</h2>
+        <span class="meta">${shown.length} of ${ordered.length} shown</span>${toggle}</div>
+      <div class="tbl-wrap"><table class="tbl lab-tree">${head}${body}</table></div>
+      ${foot}
+      <p class="lab-foot">Click a seat for its full readings.</p>`;
   }
+
+  function detailRow(m, seat) {
+    const rows = Object.values(m)
+      .map((slot) => {
+        const v = seatCell(m, slot.id, seat.role);
+        if (v === null) return null;
+        return `<div class="lab-detail-row">
+          <code>${esc(slot.id)}</code>
+          <span class="lab-detail-v">${esc(show(v))}
+            <span class="meta">${esc(slot.unit)}</span></span></div>`;
+      })
+      .filter(Boolean).join("");
+    return `<tr class="lab-detail"><td colspan="${COLS.length + 2}">${rows
+      || `<span class="meta">no per-seat readings for this seat yet</span>`}</td></tr>`;
+  }
+
+  function show(v) {
+    if (v === null || v === undefined) return "—";
+    if (typeof v === "number") return String(Math.round(v * 10000) / 10000);
+    if (Array.isArray(v)) return v.join(", ");
+    return String(v);
+  }
+
+  function wireDept() {
+    const box = document.getElementById("lab-problems");
+    if (box) {
+      box.addEventListener("change", () => {
+        problemsOnly = box.checked;
+        if (typeof render === "function") render();
+      });
+    }
+    document.querySelectorAll(".lab-seat").forEach((row) => {
+      row.addEventListener("click", () => {
+        const seat = row.getAttribute("data-seat");
+        openSeat = (openSeat === seat) ? null : seat;
+        if (typeof render === "function") render();
+      });
+    });
+  }
+
+  // --- the hand-offs ----------------------------------------------------------
+  //
+  // An arrow, not a row. `irina ──23──▶ cfo-1` says how often and in which
+  // direction in one glance, which a table of two columns does not.
+
+  function handoffFlows(m) {
+    // The slots, not their values: cellOf reads a slot's value map, and passing
+    // the map itself made every field null — which rendered as "never answered"
+    // on all fifty-seven pairs, including the ones that were answered instantly.
+    const counts = m.peer_pairs_used || {};
+    const latency = m.handoff_latency || {};
+    const unanswered = m.unanswered_handoffs || {};
+    const keys = Object.keys(counts.value || {});
+    if (!keys.length) return "";
+
+    const rows = keys.map((key) => {
+      const parts = key.split(">");
+      return {
+        key, from: parts[0], to: parts[1],
+        count: cellOf(counts, key),
+        latency: cellOf(latency, key),
+        unanswered: cellOf(unanswered, key),
+      };
+    });
+    // Worst first: a slow hand-off, then one that was never answered, then the
+    // busiest. The healthy ones sort to the bottom where they belong.
+    rows.sort((a, b) => (b.latency || 0) - (a.latency || 0)
+      || (b.unanswered || 0) - (a.unanswered || 0)
+      || (b.count || 0) - (a.count || 0));
+
+    // A pair with no latency is not a failure — it is a consultation, which has
+    // no hand-off to time. Saying "never answered" about it was a lie the page
+    // told confidently, which is worse than saying nothing.
+    const note = (r) => {
+      const bits = [];
+      if (r.latency !== null) bits.push(esc(secs(r.latency)) + " median");
+      if (r.unanswered) bits.push(esc(r.unanswered) + " unanswered");
+      if (!bits.length) bits.push("consults only");
+      return bits.join(" · ");
+    };
+
+    const body = rows.slice(0, 10).map((r) => `<div class="lab-flow">
+        <code class="lab-flow-from">${esc(r.from)}</code>
+        <span class="lab-flow-line"><i>${esc(r.count)}</i></span>
+        <code class="lab-flow-to">${esc(r.to)}</code>
+        <span class="lab-flow-note meta">${note(r)}</span>
+      </div>`).join("");
+
+    const more = rows.length > 10
+      ? `<p class="lab-foot">${rows.length} pairs in all · showing the 10 worst.</p>` : "";
+    return `<h2>The hand-offs</h2>${body}${more}`;
+  }
+
+  // --- the gaps ---------------------------------------------------------------
+  //
+  // A checklist, not a table. This is the one section where "unfinished" is the
+  // point, so it should look unfinished — and each line names what would close it.
+
+  function gaps(rows) {
+    const open = rows.filter((s) => s.value === null);
+    if (!open.length) {
+      return uiCard(`<p class="lab-quiet">Every instrument holds a value.</p>`,
+        { title: "What we can't measure yet" });
+    }
+    const body = open.map((s) => `<div class="lab-gap-row">
+        <span class="lab-gap-box">${s.state === "placeholder" ? "[-]" : "[ ]"}</span>
+        <code>${esc(s.id)}</code>
+        <span class="meta">${esc(s.filler || "")}</span></div>`).join("");
+    return uiCard(body, { title: `What we can't measure yet — ${open.length} open` });
+  }
+
+  // --- the page ---------------------------------------------------------------
 
   VIEWS.observation = (d) => {
     const m = d.metrics || {};
@@ -310,29 +432,12 @@
         computes it in concentric/metrics.py; restart the server if this page is
         empty after an update.</span>`);
     }
-    const measured = rows.filter((s) => s.value !== null).length;
-    const head = `<div class="meta" style="margin-bottom:var(--space-3)">Every metric
-      the evaluation taxonomy names, one row each — the ones this repository can
-      already answer from its traces and its state, and the ones it cannot, with
-      what would close each gap. Nothing here calls a model.</div>`;
-    const band = uiStatBand([
-      { label: "instruments", value: String(rows.length) },
-      { label: "measured", value: String(measured), tone: "ok" },
-      { label: "no data yet",
-        value: String(rows.filter((s) => s.value === null && s.state === "computed").length) },
-      { label: "ready to build",
-        value: String(rows.filter((s) => s.value === null && s.state === "ready").length) },
-      { label: "blocked",
-        value: String(rows.filter((s) => s.value === null && s.state === "blocked").length) },
-    ]);
-    // After the DOM swaps in: the button's listener, and a run in flight
-    // restored. The same deferred wiring department.js does for its own view.
-    setTimeout(wireBatch, 0);
-    return head + verdict(m, d) + batchBar(d) + band
-      + attention(m, rows)
-      + `<h2>The lenses</h2>`
-      + `<div class="lab-grid">${LENSES.map((l) => lensCard(l, m)).join("")}</div>`
-      + `<h2>Instruments</h2>`
-      + instruments(rows);
+    setTimeout(() => { wireBatch(); wireDept(); }, 0);
+    return verdict(m, d)
+      + batchBar(d)
+      + summaryLine(rows)
+      + departmentTable(d, m)
+      + handoffFlows(m)
+      + gaps(rows);
   };
 })();

@@ -708,25 +708,6 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .lab-verdict{font-size:var(--text-lg);line-height:var(--leading-snug);
   color:var(--text-ink);margin:0;max-width:80ch}
 .lab-quiet{font-size:var(--text-base);color:var(--text-faint);margin:0}
-.lab-gap{font-size:var(--text-base);color:var(--text-faint);
-  margin:var(--space-3) 0 0}
-.lab-grid{display:grid;gap:var(--space-4);margin-bottom:var(--space-6);
-  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));align-items:start}
-/* One instrument inside a lens: label and badge on one line, value under it,
-   and the reason it is empty under that. */
-.lab-row{padding:var(--space-3) 0;border-top:var(--rule-width) solid var(--rule)}
-.lab-row:first-child{border-top:0;padding-top:0}
-.lab-row-head{display:flex;align-items:baseline;justify-content:space-between;
-  gap:var(--space-3)}
-.lab-row-label{font-size:var(--text-sm);color:var(--text-ink)}
-.lab-row-value{display:flex;align-items:baseline;gap:var(--space-2);
-  margin-top:2px;min-width:0}
-.lab-row-value code{font-family:var(--face-mono);font-size:var(--text-base);
-  color:var(--text-ink);overflow-wrap:anywhere}
-.lab-row-unit{font-family:var(--face-mono);font-size:var(--text-xs);
-  color:var(--text-faint)}
-.lab-row-filler{font-size:var(--text-xs);color:var(--text-faint);
-  margin-top:3px;line-height:var(--leading-snug)}
 
 /* ---- the run button.
    The only control here that spends money, so it states the cost before the
@@ -741,16 +722,57 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .lab-run{flex-shrink:0}
 .lab-progress{flex-basis:100%;font-family:var(--face-mono);font-size:var(--text-xs);
   color:var(--text-ink);margin-top:var(--space-2)}
-.lab-row-asof{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-faint)}
 
-/* A per-seat or per-pair breakdown. Dense on purpose: the point is to compare
-   rows, and a table is what comparison looks like. */
-.lab-series{width:100%;border-collapse:collapse;font-size:var(--text-sm);margin-top:2px}
-.lab-series th{text-align:left;font-family:var(--face-mono);font-size:var(--text-xs);
-  text-transform:uppercase;letter-spacing:var(--tracking-label);color:var(--text-faint);
-  font-weight:var(--font-weight-medium);padding:2px 8px 2px 0;
-  border-bottom:var(--rule-width) solid var(--rule)}
-.lab-series td{padding:2px 8px 2px 0;border-bottom:var(--rule-width) solid var(--rule)}
-.lab-series td.num{text-align:right;font-variant-numeric:tabular-nums}
-.lab-series tr:last-child td{border-bottom:0}
-.lab-series code{font-family:var(--face-mono);font-size:var(--text-xs)}
+
+/* ---- Observation Lab: the tree, the bars, the flows, the checklist.
+   Four sections, and the numbers sit one click deeper than the answers. */
+
+.lab-summary{font-size:var(--text-sm);color:var(--text-faint);margin:0 0 var(--space-4)}
+
+.lab-dept-head{display:flex;align-items:baseline;gap:var(--space-3);
+  margin:var(--space-6) 0 var(--space-3)}
+.lab-dept-head h2{margin:0}
+.lab-toggle{margin-left:auto;display:flex;align-items:center;gap:6px;
+  font-size:var(--text-sm);color:var(--text-faint);cursor:pointer;user-select:none}
+
+/* The org tree. Indentation is the ring, so the layout is the department. */
+.lab-tree th,.lab-tree td{padding:5px 10px 5px 0}
+.lab-tree th.num,.lab-tree td.num{text-align:right;font-variant-numeric:tabular-nums}
+.lab-indent{display:inline-block;width:calc(var(--d, 0) * 15px)}
+.lab-seat{cursor:pointer}
+.lab-seat:hover{background:var(--surface-raised)}
+.lab-dash{color:var(--text-faint)}
+
+/* A bar is a fraction of the column's largest value, so the outlier finds the
+   reader without a single number being read. */
+.lab-bar{display:inline-block;width:54px;height:6px;margin-left:8px;
+  background:var(--surface-raised);border:var(--rule-width) solid var(--rule);
+  border-radius:3px;overflow:hidden;vertical-align:middle}
+.lab-bar i{display:block;height:100%;background:var(--accent)}
+
+.lab-detail td{background:var(--surface-raised);padding:var(--space-3)}
+.lab-detail-row{display:flex;justify-content:space-between;gap:var(--space-4);
+  font-size:var(--text-sm);padding:1px 0}
+.lab-detail-v{font-family:var(--face-mono);font-size:var(--text-xs)}
+
+/* A hand-off drawn as an arrow: who, how often, and to whom, in one glance. */
+.lab-flow{display:flex;align-items:center;gap:var(--space-2);padding:6px 0;
+  font-size:var(--text-sm);border-bottom:var(--rule-width) solid var(--rule)}
+.lab-flow:last-of-type{border-bottom:0}
+.lab-flow-from,.lab-flow-to{font-family:var(--face-mono);font-size:var(--text-xs);
+  color:var(--text-ink)}
+.lab-flow-line{position:relative;flex:0 0 76px;height:1px;background:var(--rule)}
+.lab-flow-line i{position:absolute;left:50%;top:-9px;transform:translateX(-50%);
+  font-style:normal;font-family:var(--face-mono);font-size:var(--text-xs);
+  color:var(--text-faint);background:var(--surface-paper);padding:0 5px}
+.lab-flow-line::after{content:"";position:absolute;right:-1px;top:-3.5px;
+  border-left:5px solid var(--rule);border-top:3.5px solid transparent;
+  border-bottom:3.5px solid transparent}
+.lab-flow-note{margin-left:auto}
+
+/* The gaps read as a to-do, because unfinished is the point. */
+.lab-gap-row{display:flex;align-items:baseline;gap:var(--space-3);padding:3px 0;
+  font-size:var(--text-sm)}
+.lab-gap-box{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-faint)}
+.lab-gap-row code{font-family:var(--face-mono);font-size:var(--text-xs);min-width:22ch}
+.lab-foot{font-size:var(--text-xs);color:var(--text-faint);margin:var(--space-2) 0 0}
