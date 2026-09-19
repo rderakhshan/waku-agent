@@ -20,13 +20,18 @@ from waku.tools.registry import Tool
 
 
 def _edge_tool(name: str, description: str, allowed: tuple[str, ...],
-               seat_for: Callable[[str], Any]) -> Tool:
+               seat_for: Callable[[str], Any], frm: str) -> Tool:
     def fn(role: str, task: str, _notify=None) -> str:
         if role not in allowed:
             return "ERROR: out of scope"
         # stream=True so a delegated seat's text reaches the same observer as
         # the parent's. Clients without streaming ignore it (waku checks).
-        return seat_for(role).respond(task, observer=_notify, stream=True).reply
+        from concentric import tracing
+
+        with tracing.handoff(name, frm, role, task):
+            reply = seat_for(role).respond(task, observer=_notify, stream=True).reply
+            tracing.set_output(reply)
+            return reply
 
     return Tool(
         name=name,
@@ -55,7 +60,7 @@ def make_delegate(spec: roster.SeatSpec, *, seat_for: Callable[[str], Any]) -> T
         return None
     return _edge_tool("delegate",
                       f"Hand a task to a seat you own: {', '.join(allowed)}.",
-                      allowed, seat_for)
+                      allowed, seat_for, spec.role)
 
 
 def make_peer(spec: roster.SeatSpec, *, seat_for: Callable[[str], Any]) -> Tool | None:
@@ -65,4 +70,4 @@ def make_peer(spec: roster.SeatSpec, *, seat_for: Callable[[str], Any]) -> Tool 
         return None
     return _edge_tool("consult_peer",
                       f"Ask a peer at your own round table: {', '.join(allowed)}.",
-                      allowed, seat_for)
+                      allowed, seat_for, spec.role)

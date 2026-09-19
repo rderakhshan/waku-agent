@@ -58,8 +58,14 @@ class Seat:
         # Waku.respond does — the dashboard passes source="dashboard" and
         # stream=True, and a narrower signature broke the dock with a TypeError.
         # Anything unrecognised is forwarded, and Waku.respond rejects it there.
-        return self.app.respond(task, observer=self._stamp(observer),
-                                source=source, stream=stream, **kwargs)
+        from concentric import tracing
+
+        with tracing.seat(self.spec.role, ring=self.spec.ring,
+                          parent=self.spec.parent, source=source):
+            result = self.app.respond(task, observer=self._stamp(observer),
+                                      source=source, stream=stream, **kwargs)
+            tracing.set_output(result.reply)
+            return result
 
     def tool_names(self) -> set[str]:
         return set(self.app.tools._tools)

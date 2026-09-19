@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -49,7 +50,11 @@ class Department:
     # long-lived seat used from a thread pool needs the cross-thread form —
     # see build_seat's docstring.
     conn_factory: Callable[[Path], Any] | None = None
+    # Groups this department's trajectories into one Laminar session. Left None,
+    # it is minted on the first run so every turn of this instance shares it.
+    session_id: str | None = None
     _seats: dict[str, Seat] = field(default_factory=dict)
+    _resolved_session: str | None = field(default=None, init=False, repr=False)
 
     def seat_for(self, role: str) -> Seat:
         if role not in self._seats:
@@ -64,8 +69,22 @@ class Department:
         return self._seats[role]
 
     def run(self, task: str, entry: str = "irina",
-            observer: Observer | None = None, stream: bool = False) -> str:
-        return self.seat_for(entry).respond(task, observer=observer, stream=stream).reply
+            observer: Observer | None = None, stream: bool = False,
+            session_id: str | None = None) -> str:
+        """One trajectory — the unit a Laminar trace is made of."""
+        from concentric import tracing
+
+        session = session_id or self.session_id or self._resolved_session
+        if session is None:
+            session = self._resolved_session = f"irina-{datetime.now():%Y%m%d-%H%M%S}"
+
+        tracing.init()
+        with tracing.trajectory(task, entry=entry, session_id=session):
+            try:
+                return self.seat_for(entry).respond(
+                    task, observer=observer, stream=stream).reply
+            finally:
+                tracing.flush()
 
 
 def build_department(*, config: dict[str, Any] | None = None,

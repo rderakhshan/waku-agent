@@ -50,6 +50,13 @@ tracing = [
     "opentelemetry-sdk>=1.27",
     "opentelemetry-exporter-otlp>=1.27",
 ]
+# Optional LLM-Ops backend for Irina's department: Laminar, a local trace + eval
+# platform. Distinct from [tracing] above, which is waku's own OTel/Phoenix
+# exporter. Off unless IRINA_LAMINAR is set and a project key is present —
+# see concentric/tracing.py.
+laminar = [
+    "lmnr>=0.7",
+]
 # Optional gateway: message your laptop from your phone
 telegram = [
     "python-telegram-bot>=21.0",
