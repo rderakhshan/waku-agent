@@ -25,6 +25,10 @@ ENTRY = "irina"
 # `.waku-` prefix means .gitignore's `.waku-*/` rule already covers it.
 STATE_ROOT = Path(".waku-concentric/agents")
 
+# Home's billboard reads this as a directory rather than a list, so dropping an
+# image in adds it to the rotation without touching code.
+BILLBOARD_DIR = Path(__file__).resolve().parents[1] / "assets" / "images"
+
 
 def seat_home(role: str, root: Path | None = None) -> Path:
     return (root or STATE_ROOT) / role

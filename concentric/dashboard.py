@@ -140,6 +140,9 @@ _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
 _AFTER = '<script src="/layout.js"></script>\n'
+# What Home's billboard will serve, by extension.
+_IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                ".gif": "image/gif", ".webp": "image/webp", ".avif": "image/avif"}
 # The sidebar mark is a CSS mask pointing at waku's svg, so the URL lives in
 # style.css and cannot be swapped by editing markup. A later stylesheet wins at
 # equal specificity, so one rule at the end of <head> repoints it. themes.css is
@@ -420,6 +423,48 @@ def _handler_class():
             if path == "/laminar.js":
                 body = (Path(__file__).parent / "static" / "laminar.js").read_bytes()
                 self._frontend(body, "text/javascript")
+                return
+            if path == "/api/billboard":
+                # The bank is a directory, not a list: dropping a file into
+                # assets/images/ adds it to Home's rotation with no code change.
+                from urllib.parse import quote
+
+                from concentric import BILLBOARD_DIR
+
+                images = []
+                if BILLBOARD_DIR.is_dir():
+                    # Quoted, because a filename with a space is otherwise a URL
+                    # the browser encodes and this route then cannot match.
+                    images = [f"/assets/images/{quote(p.name)}"
+                              for p in sorted(BILLBOARD_DIR.iterdir())
+                              if p.is_file() and p.suffix.lower() in _IMAGE_TYPES]
+                self._send(json.dumps({"images": images}).encode("utf-8"),
+                           "application/json", no_cache=True)
+                return
+            if path.startswith("/assets/images/"):
+                from urllib.parse import unquote
+
+                from concentric import BILLBOARD_DIR
+
+                target = (BILLBOARD_DIR / unquote(path[len("/assets/images/"):])).resolve()
+                # Only files that are actually in the bank, whatever the URL says.
+                if target.is_file() and target.parent == BILLBOARD_DIR.resolve():
+                    body = target.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type",
+                                     _IMAGE_TYPES.get(target.suffix.lower(),
+                                                      "application/octet-stream"))
+                    self.send_header("Content-Length", str(len(body)))
+                    # Unlike the rest of the launcher's files, these are worth
+                    # caching: the billboard reloads one every few seconds.
+                    self.send_header("Cache-Control", "max-age=3600")
+                    self.end_headers()
+                    try:
+                        self.wfile.write(body)
+                    except ABORTED:
+                        pass
+                    return
+                self.send_error(404)
                 return
             if path == "/irina-mark.svg":
                 body = (Path(__file__).parent / "static" / "irina-mark.svg").read_bytes()
