@@ -36,6 +36,11 @@ rather than in prompts.
 
 *The GIF is a 20-second preview; click it for the full demo (7 min).*
 
+![Irina's dashboard](docs/billboard.gif)
+
+*A pass through the dashboard: the pitch and the billboard on Home, then the
+department on the Work Desk.*
+
 ```bash
 uv run python -m concentric                  # talk to Irina in the terminal
 uv run python -m concentric "tier the IFRS 9 model"
