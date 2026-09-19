@@ -21,6 +21,12 @@ SMALL_MODEL = "deepseek-v4-flash"
 # whole subtree, so they are the department's source of truth for activity.
 ENTRY = "irina"
 
+# The tools every seat holds before anything is granted. Kept here rather than in
+# seat.py so the toolbox can name them without importing waku: the Market has to
+# be able to say "every seat" about these, instead of "nobody", which is what the
+# grant file alone would report and what the department page contradicts.
+BASE_TOOLS = ("save_note", "manage_memory")
+
 # Where the seats keep their own memory, prompts, traces and ledgers. The
 # `.waku-` prefix means .gitignore's `.waku-*/` rule already covers it.
 STATE_ROOT = Path(".waku-concentric/agents")

@@ -14,15 +14,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from concentric import roster, seat_home
+from concentric import BASE_TOOLS, roster, seat_home
 from concentric.delegate import make_delegate, make_peer
 from waku.app import Waku
 from waku.config import Settings
 from waku.loop.agent import LoopResult, Observer
-
-# What every seat may do before the graph's own tools are added. Deliberately
-# small: this prototype is proving the edges, not the domain toolset.
-BASE_TOOLS = ("save_note", "manage_memory")
 
 
 def _soul(spec: roster.SeatSpec) -> str:

@@ -6,11 +6,22 @@ worker delegating. A rule like that only means something if the decision is
 written down somewhere a reader can find, so it lives in a file, not in a prompt
 and never in a model's guess at run time.
 
+## The page
+
+Five tabs: **Available** — what the agent can call this turn, drawn as the same
+cards the Market uses; **Results** — what it called; **Market** — what a seat may
+hold; **LAB** — build a tool; **MCP** — external servers.
+
 ## The default is nobody
 
 A fresh department grants nothing. Every seat starts with the two tools it always
 had — `save_note` and `manage_memory` — plus the delegation tools its ring allows.
 Everything else arrives because someone said so.
+
+Those two are shown as **every seat** rather than *nobody*, and carry no Assign
+button: they are the floor, held before anything is granted. Reporting the grant
+file alone would have the Market say "nobody" about a tool the department page
+says is held by all twenty-four seats.
 
 The file is `.waku-concentric/toolbox.json`, beside `metrics.db` and gitignored,
 because an assignment is a choice about your own department rather than source:

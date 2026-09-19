@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from concentric import roster
+from concentric import BASE_TOOLS, roster
 
 # Where the generated tools live. One file per tool, named after it.
 TOOLS_DIR = Path(__file__).resolve().parent / "tools"
@@ -196,11 +196,17 @@ def market() -> list[dict[str, Any]]:
     box = load()
     cards: list[dict[str, Any]] = []
 
+    everyone = [s.role for s in roster.SEATS]
     for item in BUILTIN_TOOLS:
+        # The floor tools are held by every seat without anyone granting them, so
+        # reporting the grant file alone would say "nobody" about a tool the whole
+        # department holds — and the department page already says otherwise.
+        floor = item["name"] in BASE_TOOLS
         cards.append({"name": item["name"], "description": item["description"],
-                      "schema": {}, "switch": item["switch"], "state": "builtin",
+                      "schema": {}, "switch": item["switch"],
+                      "state": "floor" if floor else "builtin",
                       "icon": item["icon"], "origin": "builtin", "source": "",
-                      "roles": box.get(item["name"], [])})
+                      "roles": everyone if floor else box.get(item["name"], [])})
 
     if TOOLS_DIR.is_dir():
         for path in sorted(TOOLS_DIR.glob("*.py")):

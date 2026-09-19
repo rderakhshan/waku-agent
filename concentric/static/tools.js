@@ -12,8 +12,6 @@
 (function () {
   "use strict";
 
-  const base = VIEWS.tools;   // waku's page, kept whole as tab one
-
   let box = null;             // { tools, roles } from the server
 
   let note = "";
@@ -62,6 +60,7 @@
 
   function state(t) {
     if (t.state === "planned") return ["not-configured", "planned"];
+    if (t.state === "floor") return ["connected", "every seat"];
     if (t.switch) return ["needs-setup", "needs setup"];
     if (held(t).length) return ["connected", "assigned"];
     return ["not-configured", "nobody"];
@@ -92,6 +91,10 @@
     let actions;
     if (t.state === "planned") {
       actions = `<span class="connwhy">on waku's wish list</span>`;
+    } else if (t.state === "floor") {
+      // Nothing to grant: every seat has it before anything is assigned, so an
+      // Assign button here would only offer what the department already has.
+      actions = `<span class="connwhy">the floor — no seat can be without it</span>`;
     } else {
       actions = `${chips(t)}
         <button type="button" class="btn btn-secondary btn-sm"
@@ -118,15 +121,17 @@
       return uiCard(`<p class="meta">reading the toolbox…</p>`);
     }
     const all = box.tools || [];
-    const mine = (t) => t.state !== "planned" && held(t).length;
+    const floor = (t) => t.state === "floor";
+    const mine = (t) => t.state !== "planned" && !floor(t) && held(t).length;
     return `<h2>${icon("tools", "ic-lead")}The market</h2>
       <p class="home-p">Every tool a seat could hold. Nobody has one until this page
       says so, and a seat without a tool cannot use it — the tool is absent, not
       refused.</p>
       ${note ? `<p class="meta">${esc(note)}</p>` : ""}
+      ${section("Every seat, before anything is assigned", all.filter(floor))}
       ${section("Assigned", all.filter(mine))}
-      ${section("Ready to give", all.filter((t) => t.state !== "planned" && !t.switch && !held(t).length))}
-      ${section("Present, but switched off", all.filter((t) => t.state !== "planned" && t.switch && !held(t).length))}
+      ${section("Ready to give", all.filter((t) => t.state !== "planned" && !floor(t) && !t.switch && !held(t).length))}
+      ${section("Present, but switched off", all.filter((t) => t.state !== "planned" && !floor(t) && t.switch && !held(t).length))}
       ${section("Planned", all.filter((t) => t.state === "planned"))}`;
   }
 
@@ -294,14 +299,63 @@
     }
   };
 
+  // --- Available ---------------------------------------------------------------
+  //
+  // waku's own page, in the market's clothes. The two answer different
+  // questions — Available is what the agent can call this turn, the Market is
+  // what a seat may hold — so the pill here is the one fact that joins them:
+  // whether this tool has been given to anyone.
+
+  const SRC_LABEL = {
+    flagship: "Flagship task — scheduling",
+    web: "Web search",
+    "self-management": "Self-management — it edits its own memory",
+    apple: "Apple ecosystem",
+    mcp: "MCP servers",
+    other: "Other",
+  };
+
+  function availableCard(item) {
+    // No pill here. This list comes from the department's own payload, which
+    // already writes the holders into the description — a pill would repeat it,
+    // and the two sources do not count the same thing.
+    const t = (box && box.tools ? box.tools : []).find((x) => x.name === item.name);
+    return uiCard(
+      `<span class="provlogo tool-tile">${icon((t && t.icon) || "tools")}</span>
+       <div class="conndesc">${esc(item.description || "")}</div>`,
+      { title: esc(item.name), cls: "provcard conncard" });
+  }
+
+  function available(d) {
+    if (box === null) setTimeout(load, 0);
+    const catalog = (d.tools && d.tools.catalog) || [];
+    const order = ["flagship", "web", "self-management", "apple", "mcp", "other"];
+    const keys = order.concat(catalog.map((c) => c.source).filter((s) => !order.includes(s)));
+    let html = `<h2>${icon("tools", "ic-lead")}Available</h2>
+      <p class="home-p">What the agent can call this turn: a name and a description
+      the model reads, a shape for the arguments, and a Python function. Tools that
+      are only planned are in the Market.</p>`;
+    for (const key of keys) {
+      const items = catalog.filter((c) => c.source === key);
+      if (!items.length) continue;
+      html += `<section class="connsection"><h2>${esc(SRC_LABEL[key] || key)}</h2>
+        <div class="provgrid conngrid">${items.map(availableCard).join("")}</div></section>`;
+    }
+    return html;
+  }
+
   VIEWS.tools = (d, sub) => {
     const tabs = uiTabs([
       { label: "Available", href: "#tools", on: !sub },
+      { label: "Results", href: "#tools/results", on: sub === "results" },
       { label: "Market", href: "#tools/market", on: sub === "market" },
       { label: "LAB", href: "#tools/lab", on: sub === "lab" },
+      { label: "MCP", href: "#tools/mcp", on: sub === "mcp" },
     ]);
+    if (sub === "results") return tabs + toolsResults(d);
     if (sub === "market") return tabs + market();
     if (sub === "lab") return tabs + labTab();
-    return tabs + base(d, sub);
+    if (sub === "mcp") return tabs + toolsMCP(d.tools || {});
+    return tabs + available(d);
   };
 })();

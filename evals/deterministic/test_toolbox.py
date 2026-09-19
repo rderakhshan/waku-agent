@@ -81,6 +81,17 @@ def test_every_builtin_card_says_which_switch_gates_it():
             assert "switch" in card
 
 
+def test_the_floor_tools_report_every_seat_not_nobody():
+    """`save_note` is held by every seat before anything is granted, and the
+    department page says so — reporting the grant file alone would have the two
+    halves of the dashboard disagreeing about the same tool."""
+    cards = {c["name"]: c for c in toolbox.market()}
+    floor = cards["save_note"]
+    assert floor["state"] == "floor"
+    assert len(floor["roles"]) == 24
+    assert toolbox.load() == {}          # and yet nothing is in the file
+
+
 def test_a_generated_file_becomes_a_card_without_running_it(tmp_path, monkeypatch):
     """The load-bearing test: a card is read, not executed."""
     monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
