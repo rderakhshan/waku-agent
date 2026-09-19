@@ -4,29 +4,41 @@ One `Department.run()` is one Laminar trace; one `Seat.respond()` is one span;
 one `delegate` / `consult_peer` call is one handoff span. That is the whole
 mapping: the trajectory, the seats it used, and the edges between them.
 
-Nothing here runs unless `IRINA_LAMINAR` is set AND the `lmnr` SDK is importable
-AND a project key is present AND `Laminar.initialize()` succeeds. Every helper
-is otherwise a no-op, so Irina behaves exactly as it does without this module.
-Tracing must never be able to break the loop, and it must never be a hard
-dependency — optional things live behind an extra (`[laminar]`).
+Tracing is on by default: every trajectory is recorded as it is created. It
+stops only when `IRINA_LAMINAR=off` is set, or the `lmnr` SDK is missing, or no
+project key is present, or `Laminar.initialize()` fails — and every helper is
+then a no-op, so Irina behaves exactly as it does without this module. Tracing
+must never be able to break the loop, and it must never be a hard dependency —
+optional things live behind an extra (`[laminar]`).
 
-The store is a separate service (`laminar/` in this repo runs it locally), so
-"off" is the normal state on a machine that has not started it.
+The store is a separate service (`laminar/` in this repo runs it locally). While
+it is down the spans for that window are lost, but the local trajectory index
+still records that the run happened — a stopped stack must not erase the fact of
+a run.
 """
 
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any
 
+# Tracing is ON by default: a run that happened should be recorded without
+# anyone remembering a switch. `IRINA_LAMINAR=off` is the only way to stop it.
 ENV_FLAG = "IRINA_LAMINAR"
-_TRUTHY = {"1", "on", "true", "yes"}
+_OFF = {"0", "off", "false", "no"}
+
+# How long to wait before a failed init is tried again. A down server has to
+# cost one check a minute, not one per turn.
+RETRY_SECONDS = 60.0
 
 # Set once by init(); read by every helper. None means tracing is off.
 _Laminar: Any = None
+_failed_at: float = 0.0
 
 # How deep the current trajectory is nested. A contextvar, not a global: the
 # dashboard is a threaded server, and a shared counter would let one request's
@@ -44,28 +56,50 @@ def enabled() -> bool:
     return _Laminar is not None
 
 
-def _flag_set() -> bool:
-    return (os.environ.get(ENV_FLAG) or "").strip().lower() in _TRUTHY
+def _disabled() -> bool:
+    return (os.environ.get(ENV_FLAG) or "").strip().lower() in _OFF
+
+
+def _load_env_file() -> None:
+    """Make the repo's .env visible here.
+
+    waku loads it too, but not necessarily before the first trajectory, and the
+    tracing config must not depend on import order. `override=False` so a real
+    environment variable always beats the file.
+    """
+    try:
+        from dotenv import load_dotenv
+    except Exception:
+        return
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 
 def init() -> bool:
     """Import and initialise the SDK once. True when tracing is live.
 
     Called on every trajectory; after the first success it is a cheap bool
-    read. A missing SDK, a missing key or an unreachable server is not an
-    error — it just leaves tracing off, which is the documented default.
+    read, and after a failure it is a cheap bool read until the retry window
+    passes. A missing SDK, a missing key or an unreachable server is not an
+    error — it just leaves this run untraced, which the local index still
+    records.
     """
-    global _Laminar
+    global _Laminar, _failed_at
     if _Laminar is not None:
         return True
-    if not _flag_set():
+    if _disabled():
         return False
+    if _failed_at and (time.monotonic() - _failed_at) < RETRY_SECONDS:
+        return False
+
+    _load_env_file()
     key = (os.environ.get("LMNR_PROJECT_API_KEY") or "").strip()
     if not key:
-        return False  # configured to trace, but nothing to trace to
+        _failed_at = time.monotonic()
+        return False  # nothing to trace to
     try:
         from lmnr import Laminar
     except Exception:
+        _failed_at = time.monotonic()
         return False
     try:
         Laminar.initialize(
@@ -75,6 +109,7 @@ def init() -> bool:
             grpc_port=int(os.environ.get("LMNR_GRPC_PORT", "8001")),
         )
     except Exception:
+        _failed_at = time.monotonic()
         return False
     _Laminar = Laminar
     return True

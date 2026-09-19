@@ -95,6 +95,9 @@ class Seat:
         from concentric import history, tracing
 
         tracing.init()
+        # An explicit id wins; otherwise waku's conversation id, so the dashboard
+        # groups too — it calls this seat directly and never passes one.
+        session = session_id or _session_of(self.app)
         started = time.monotonic()
         seats: list[str] = []
         handoffs = 0
@@ -109,20 +112,21 @@ class Seat:
             if observer is not None:
                 observer(kind, event)
 
-        with tracing.trajectory(task, entry=self.spec.role, session_id=session_id):
+        with tracing.trajectory(task, entry=self.spec.role, session_id=session):
             try:
                 return self._turn(task, watch, source, stream, kwargs)
             finally:
                 tracing.flush()
-                trace = tracing.trace_id()
-                if trace:
-                    try:
-                        history.record_trajectory(
-                            trace, session_id=session_id, entry=self.spec.role,
-                            seats=seats, handoffs=handoffs,
-                            duration_ms=int((time.monotonic() - started) * 1000))
-                    except Exception:
-                        pass  # the store must never take the run down
+                try:
+                    # The trace id is None when Laminar was unreachable; the row
+                    # is written either way, so an outage costs the detail and
+                    # never the fact.
+                    history.record_trajectory(
+                        tracing.trace_id(), session_id=session,
+                        entry=self.spec.role, seats=seats, handoffs=handoffs,
+                        duration_ms=int((time.monotonic() - started) * 1000))
+                except Exception:
+                    pass  # the store must never take the run down
 
     def tool_names(self) -> set[str]:
         return set(self.app.tools._tools)
@@ -153,6 +157,17 @@ def _stamp_tracer(app: Waku, spec: roster.SeatSpec) -> None:
         write(kind, {"role": spec.role, "ring": spec.ring, "parent": spec.parent, **event})
 
     app.tracer.event = stamped
+
+
+def _session_of(app: Waku) -> str | None:
+    """waku's own conversation id.
+
+    It is the same id `chat_log` groups by, so a Laminar session is the
+    conversation the dashboard already shows under History — not a second
+    notion of "session" invented here.
+    """
+    session = getattr(app, "session", None)
+    return getattr(session, "session_id", None) or None
 
 
 def build_seat(spec: roster.SeatSpec, *, config: dict[str, Any],

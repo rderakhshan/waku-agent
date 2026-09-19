@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -50,11 +49,10 @@ class Department:
     # long-lived seat used from a thread pool needs the cross-thread form —
     # see build_seat's docstring.
     conn_factory: Callable[[Path], Any] | None = None
-    # Groups this department's trajectories into one Laminar session. Left None,
-    # it is minted on the first run so every turn of this instance shares it.
+    # Overrides the session a trajectory is filed under. Left None, the seat
+    # uses waku's own conversation id, which is what the chat log groups by.
     session_id: str | None = None
     _seats: dict[str, Seat] = field(default_factory=dict)
-    _resolved_session: str | None = field(default=None, init=False, repr=False)
 
     def seat_for(self, role: str) -> Seat:
         if role not in self._seats:
@@ -73,15 +71,15 @@ class Department:
             session_id: str | None = None) -> str:
         """One trajectory. The seat it enters through opens the trace.
 
-        The trace and its index row live in `Seat.respond`, not here, because
-        the dashboard reaches Irina without going through this method — one
-        boundary in the seat covers both callers.
+        The trace, the session id and the index row all live in `Seat.respond`,
+        not here, because the dashboard reaches Irina without going through this
+        method — one boundary in the seat covers both callers. The session id is
+        waku's own (`session.session_id`), so a Laminar session is the same
+        conversation the chat log already groups by.
         """
-        session = session_id or self.session_id or self._resolved_session
-        if session is None:
-            session = self._resolved_session = f"irina-{datetime.now():%Y%m%d-%H%M%S}"
         return self.seat_for(entry).respond(
-            task, observer=observer, stream=stream, session_id=session).reply
+            task, observer=observer, stream=stream,
+            session_id=session_id or self.session_id).reply
 
 
 def build_department(*, config: dict[str, Any] | None = None,

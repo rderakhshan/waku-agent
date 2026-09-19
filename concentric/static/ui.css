@@ -812,3 +812,13 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .lab-cause-value{font-family:var(--face-mono);font-size:var(--text-xs);
   color:var(--text-ink);min-width:3ch;text-align:right}
 .lab-cause-row .meta{flex:1;min-width:0;overflow-wrap:anywhere}
+
+/* ---- Laminar, embedded.
+   It is a page in the rail but not a child of #view — main.js rebuilds #view
+   every 5s and that would reload the iframe. The panel is fixed and sized to
+   #view's box by laminar.js, so it sits exactly where the page content would. */
+#laminar-panel{position:fixed;z-index:20;overflow:hidden;
+  background:var(--surface-paper);border:var(--rule-width) solid var(--rule);
+  border-radius:var(--radius,8px)}
+#laminar-panel[hidden]{display:none}
+.laminar-frame{display:block;width:100%;height:100%;border:0}

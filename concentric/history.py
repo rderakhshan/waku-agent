@@ -72,7 +72,8 @@ CREATE TABLE IF NOT EXISTS readings (
 CREATE INDEX IF NOT EXISTS ix_series ON readings(metric, subject, snapshot);
 CREATE TABLE IF NOT EXISTS marks (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE IF NOT EXISTS trajectories (
-  trace_id    TEXT PRIMARY KEY,
+  id          INTEGER PRIMARY KEY,
+  trace_id    TEXT UNIQUE,
   ts          TEXT NOT NULL,
   session_id  TEXT,
   entry       TEXT,
@@ -81,6 +82,29 @@ CREATE TABLE IF NOT EXISTS trajectories (
   duration_ms INTEGER
 );
 CREATE INDEX IF NOT EXISTS ix_trajectories_ts ON trajectories(ts);
+"""
+
+# The first cut keyed the row on `trace_id`, which made a run without one
+# unrepresentable — and a run without one is exactly what a Laminar outage
+# produces. The row is the local fact; the trace is the detail.
+_MIGRATE_TRAJECTORIES = """
+DROP INDEX IF EXISTS ix_trajectories_ts;
+ALTER TABLE trajectories RENAME TO trajectories_old;
+CREATE TABLE trajectories (
+  id          INTEGER PRIMARY KEY,
+  trace_id    TEXT UNIQUE,
+  ts          TEXT NOT NULL,
+  session_id  TEXT,
+  entry       TEXT,
+  seats       TEXT,
+  handoffs    INTEGER,
+  duration_ms INTEGER
+);
+CREATE INDEX ix_trajectories_ts ON trajectories(ts);
+INSERT INTO trajectories (trace_id, ts, session_id, entry, seats, handoffs, duration_ms)
+  SELECT trace_id, ts, session_id, entry, seats, handoffs, duration_ms
+  FROM trajectories_old;
+DROP TABLE trajectories_old;
 """
 
 
@@ -117,6 +141,9 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(trajectories)")}
+    if "id" not in columns:  # written before a trace_id could be absent
+        conn.executescript(_MIGRATE_TRAJECTORIES)
     return conn
 
 
@@ -143,26 +170,32 @@ def set_mark(conn: sqlite3.Connection, key: str, value: str) -> None:
 # seat is worst", and this table answers "which run was that". It is deliberately
 # thin — the run itself lives in Laminar, and the trace_id is the way there.
 
-def record_trajectory(trace_id: str, *, ts: str | None = None,
+def record_trajectory(trace_id: str | None, *, ts: str | None = None,
                       session_id: str | None = None, entry: str | None = None,
                       seats: list[str] | None = None, handoffs: int = 0,
                       duration_ms: int | None = None,
                       conn: sqlite3.Connection | None = None) -> None:
-    """Index one traced run. Called after a trajectory finishes, not before —
-    a row for a run that never completed would be a claim about nothing."""
+    """Index one run. Called after a trajectory finishes, not before — a row for
+    a run that never completed would be a claim about nothing.
+
+    `trace_id` is None when Laminar could not be reached. The row is written
+    anyway: the run happened, and an unreachable store must not erase the fact
+    of it, only the detail.
+    """
     own = conn is None
     conn = conn or connect()
     try:
-        conn.execute(
-            "INSERT INTO trajectories"
-            "(trace_id, ts, session_id, entry, seats, handoffs, duration_ms) "
-            "VALUES(?, ?, ?, ?, ?, ?, ?) "
-            "ON CONFLICT(trace_id) DO UPDATE SET "
-            "ts = excluded.ts, session_id = excluded.session_id, "
-            "entry = excluded.entry, seats = excluded.seats, "
-            "handoffs = excluded.handoffs, duration_ms = excluded.duration_ms",
-            (trace_id, ts or datetime.now(UTC).isoformat(), session_id, entry,
-             ",".join(seats or []), handoffs, duration_ms))
+        columns = ("(trace_id, ts, session_id, entry, seats, handoffs, duration_ms)")
+        values = (trace_id, ts or datetime.now(UTC).isoformat(), session_id,
+                  entry, ",".join(seats or []), handoffs, duration_ms)
+        sql = f"INSERT INTO trajectories {columns} VALUES(?, ?, ?, ?, ?, ?, ?)"
+        if trace_id is not None:
+            # A trace seen twice is the same run, not two.
+            sql += (" ON CONFLICT(trace_id) DO UPDATE SET ts = excluded.ts,"
+                    " session_id = excluded.session_id, entry = excluded.entry,"
+                    " seats = excluded.seats, handoffs = excluded.handoffs,"
+                    " duration_ms = excluded.duration_ms")
+        conn.execute(sql, values)
         conn.commit()
     finally:
         if own:
@@ -180,7 +213,7 @@ def trajectories(limit: int = 50, since: str | None = None,
         if since:
             sql += " WHERE ts >= ?"
             params.append(since)
-        sql += " ORDER BY ts DESC LIMIT ?"
+        sql += " ORDER BY ts DESC, id DESC LIMIT ?"
         params.append(limit)
         return [dict(row) for row in conn.execute(sql, params).fetchall()]
     finally:
@@ -498,7 +531,7 @@ def main() -> None:
         print(f"trajectories - {len(rows)} most recent")
         for r in rows:
             print(f"  {r['ts']}  {r['entry'] or '?':<8} "
-                  f"{r['handoffs'] or 0} handoffs  {r['trace_id']}")
+                  f"{r['handoffs'] or 0} handoffs  {r['trace_id'] or '(untraced)'}")
         return
     if not args.metric:
         rows = conn.execute(

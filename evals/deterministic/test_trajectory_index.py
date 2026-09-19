@@ -8,6 +8,8 @@ is seen twice — so both are pinned here.
 
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from concentric import history
@@ -62,3 +64,51 @@ def test_a_run_with_no_seats_still_records(conn):
     assert row["seats"] == ""
     assert row["handoffs"] == 0
     assert row["ts"]
+
+
+# --- a run Laminar never saw ------------------------------------------------
+#
+# The row is the local fact; the trace is the detail. An unreachable store must
+# cost the detail and never the fact, so an absent trace id has to be storable.
+
+def test_an_untraced_run_is_still_recorded(conn):
+    history.record_trajectory(None, entry="irina", handoffs=2, conn=conn)
+    rows = history.trajectories(conn=conn)
+    assert len(rows) == 1
+    assert rows[0]["trace_id"] is None
+    assert rows[0]["entry"] == "irina"
+    assert rows[0]["handoffs"] == 2
+
+
+def test_two_untraced_runs_are_two_rows(conn):
+    """NULL is not a key, so these must not collapse into one another."""
+    history.record_trajectory(None, conn=conn)
+    history.record_trajectory(None, conn=conn)
+    assert len(history.trajectories(conn=conn)) == 2
+
+
+def test_an_old_table_is_migrated_and_keeps_its_rows(tmp_path):
+    """The first cut keyed on trace_id. An existing file must survive that."""
+    path = tmp_path / "old.db"
+    raw = sqlite3.connect(path)
+    raw.executescript(
+        "CREATE TABLE trajectories ("
+        " trace_id TEXT PRIMARY KEY, ts TEXT NOT NULL, session_id TEXT,"
+        " entry TEXT, seats TEXT, handoffs INTEGER, duration_ms INTEGER);"
+        "INSERT INTO trajectories VALUES"
+        " ('t-old','2026-01-01T00:00:00+00:00','s','irina','irina',1,10);")
+    raw.commit()
+    raw.close()
+
+    conn = history.connect(path)
+    try:
+        columns = {r["name"] for r in conn.execute("PRAGMA table_info(trajectories)")}
+        assert "id" in columns
+        rows = history.trajectories(conn=conn)
+        assert [r["trace_id"] for r in rows] == ["t-old"]
+        assert rows[0]["handoffs"] == 1
+        # and the new shape works on the migrated file
+        history.record_trajectory(None, conn=conn)
+        assert len(history.trajectories(conn=conn)) == 2
+    finally:
+        conn.close()

@@ -136,6 +136,7 @@ def department_payload() -> dict:
 _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/home.js"></script>\n'
            '<script src="/observation.js"></script>\n'
+           '<script src="/laminar.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
 _AFTER = '<script src="/layout.js"></script>\n'
@@ -230,6 +231,9 @@ def _rail(html: str) -> str:
     # here because _fold() only retags rows that already exist in the shell.
     html = html.replace(
         '<a href="#compare/models"',
+        '<a data-grp="llmops" hidden href="#laminar" data-v="laminar" '
+        'data-short="X" aria-label="Laminar">'
+        '<span class="lbl">Laminar</span></a>\n  '
         '<a data-grp="llmops" hidden href="#observation" data-v="observation" '
         'data-short="L" aria-label="Observation Lab">'
         '<span class="lbl">Observation Lab</span></a>\n  '
@@ -308,7 +312,92 @@ def _handler_class():
             except ABORTED:
                 pass
 
+        # Where the Laminar frontend runs. Its base path is baked in at build
+        # time (NEXT_PUBLIC_BASE_PATH=/laminar), so the path is forwarded as-is.
+        LAMINAR_UPSTREAM = "http://localhost:5667"
+
+        def _proxy_laminar(self) -> bool:
+            """Serve /laminar/* from the Laminar frontend, so it can be framed.
+
+            Laminar forbids framing on purpose — `X-Frame-Options: DENY` and a
+            CSP `frame-ancestors 'none'` — and Next.js bakes asset paths at build
+            time, so the frontend is built with `NEXT_PUBLIC_BASE_PATH=/laminar`
+            and proxied here unchanged. Three things happen on the way through:
+            the framing headers are dropped, the CSP is passed on with only the
+            directive that blocks framing removed, and the body is streamed
+            rather than buffered so realtime responses keep flowing.
+
+            Returns True when it handled the request, so the caller stops.
+            """
+            import http.client
+            from urllib.parse import urlsplit
+
+            if self.path != "/laminar" and not self.path.startswith("/laminar/"):
+                return False
+
+            length = int(self.headers.get("Content-Length") or 0)
+            body = self.rfile.read(length) if length else None
+
+            forwarded = {}
+            for key, value in self.headers.items():
+                low = key.lower()
+                # Host would name the wrong origin; the rest are hop-by-hop, or
+                # would pin an encoding we then have to decode.
+                if low in ("host", "accept-encoding", "connection", "keep-alive",
+                           "transfer-encoding", "content-length"):
+                    continue
+                forwarded[key] = value
+            if body is not None:
+                forwarded["Content-Length"] = str(len(body))
+
+            parts = urlsplit(self.LAMINAR_UPSTREAM)
+            conn = http.client.HTTPConnection(parts.hostname, parts.port or 80,
+                                              timeout=60)
+            try:
+                conn.request(self.command, self.path, body=body, headers=forwarded)
+                resp = conn.getresponse()
+            except Exception as exc:
+                self.send_response(502)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(
+                    f"Laminar is not reachable at {self.LAMINAR_UPSTREAM} "
+                    f"({exc}). Start it with laminar\\run.ps1.".encode())
+                return True
+
+            self.send_response(resp.status)
+            for key, value in resp.getheaders():
+                low = key.lower()
+                if low in ("x-frame-options", "connection", "keep-alive",
+                           "transfer-encoding", "content-length",
+                           "content-encoding", "content-security-policy"):
+                    continue
+                self.send_header(key, value)
+            csp = resp.getheader("Content-Security-Policy")
+            if csp:
+                kept = [d for d in csp.split(";")
+                        if not d.strip().lower().startswith("frame-ancestors")]
+                self.send_header("Content-Security-Policy", ";".join(kept))
+            self.send_header("Connection", "close")
+            self.end_headers()
+
+            self.close_connection = True
+            try:
+                while True:
+                    chunk = resp.read(8192)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    self.wfile.flush()
+            except Exception:
+                pass  # the browser navigated away mid-stream — fine
+            finally:
+                conn.close()
+            return True
+
         def do_GET(self):  # noqa: N802 — BaseHTTPRequestHandler's name
+            if self._proxy_laminar():
+                return
             path = self.path.split("?", 1)[0]
             if path == "/department.js":
                 body = (Path(__file__).parent / "static" / "department.js").read_bytes()
@@ -320,6 +409,10 @@ def _handler_class():
                 return
             if path == "/observation.js":
                 body = (Path(__file__).parent / "static" / "observation.js").read_bytes()
+                self._frontend(body, "text/javascript")
+                return
+            if path == "/laminar.js":
+                body = (Path(__file__).parent / "static" / "laminar.js").read_bytes()
                 self._frontend(body, "text/javascript")
                 return
             if path == "/irina-mark.svg":
@@ -479,6 +572,8 @@ def _handler_class():
             a spinner with nothing behind it. This mirrors /api/compare/stream,
             which is the arena's version of the same idea.
             """
+            if self._proxy_laminar():
+                return
             if self.path.split("?", 1)[0] != "/api/metrics/run":
                 try:
                     super().do_POST()
