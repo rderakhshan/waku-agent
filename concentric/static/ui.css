@@ -880,3 +880,46 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
   border-radius:var(--radius,8px)}
 #laminar-panel[hidden]{display:none}
 .laminar-frame{display:block;width:100%;height:100%;border:0}
+
+/* ---- icons.
+   Lucide (ISC), vendored as files and drawn with a mask, so each one takes the
+   colour of the text it sits in: no icon font, no network, and no colour or
+   size of its own to fall out of step with the theme. */
+/* Where the words follow on the same line and no flex gap separates them. A
+   button already has `gap`, so it must not get this too. */
+.ic-lead{margin-right:calc(var(--spacing) * 0.5)}
+.ic{display:inline-block;width:1em;height:1em;flex:none;vertical-align:-0.125em;
+  background-color:currentColor;
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center;mask-position:center;
+  -webkit-mask-size:contain;mask-size:contain}
+.ic-alert{-webkit-mask-image:url(/icons/alert.svg);mask-image:url(/icons/alert.svg)}
+.ic-branch{-webkit-mask-image:url(/icons/branch.svg);mask-image:url(/icons/branch.svg)}
+.ic-chart{-webkit-mask-image:url(/icons/chart.svg);mask-image:url(/icons/chart.svg)}
+.ic-check{-webkit-mask-image:url(/icons/check.svg);mask-image:url(/icons/check.svg)}
+.ic-clock{-webkit-mask-image:url(/icons/clock.svg);mask-image:url(/icons/clock.svg)}
+.ic-connections{-webkit-mask-image:url(/icons/connections.svg);mask-image:url(/icons/connections.svg)}
+.ic-cross{-webkit-mask-image:url(/icons/cross.svg);mask-image:url(/icons/cross.svg)}
+.ic-dashboard{-webkit-mask-image:url(/icons/dashboard.svg);mask-image:url(/icons/dashboard.svg)}
+.ic-database{-webkit-mask-image:url(/icons/database.svg);mask-image:url(/icons/database.svg)}
+.ic-external{-webkit-mask-image:url(/icons/external.svg);mask-image:url(/icons/external.svg)}
+.ic-file{-webkit-mask-image:url(/icons/file.svg);mask-image:url(/icons/file.svg)}
+.ic-gateway{-webkit-mask-image:url(/icons/gateway.svg);mask-image:url(/icons/gateway.svg)}
+.ic-gauge{-webkit-mask-image:url(/icons/gauge.svg);mask-image:url(/icons/gauge.svg)}
+.ic-graph{-webkit-mask-image:url(/icons/graph.svg);mask-image:url(/icons/graph.svg)}
+.ic-home{-webkit-mask-image:url(/icons/home.svg);mask-image:url(/icons/home.svg)}
+.ic-image{-webkit-mask-image:url(/icons/image.svg);mask-image:url(/icons/image.svg)}
+.ic-inbox{-webkit-mask-image:url(/icons/inbox.svg);mask-image:url(/icons/inbox.svg)}
+.ic-lab{-webkit-mask-image:url(/icons/lab.svg);mask-image:url(/icons/lab.svg)}
+.ic-loop{-webkit-mask-image:url(/icons/loop.svg);mask-image:url(/icons/loop.svg)}
+.ic-memory{-webkit-mask-image:url(/icons/memory.svg);mask-image:url(/icons/memory.svg)}
+.ic-models{-webkit-mask-image:url(/icons/models.svg);mask-image:url(/icons/models.svg)}
+.ic-ops{-webkit-mask-image:url(/icons/ops.svg);mask-image:url(/icons/ops.svg)}
+.ic-race{-webkit-mask-image:url(/icons/race.svg);mask-image:url(/icons/race.svg)}
+.ic-refresh{-webkit-mask-image:url(/icons/refresh.svg);mask-image:url(/icons/refresh.svg)}
+.ic-search{-webkit-mask-image:url(/icons/search.svg);mask-image:url(/icons/search.svg)}
+.ic-settings{-webkit-mask-image:url(/icons/settings.svg);mask-image:url(/icons/settings.svg)}
+.ic-shield{-webkit-mask-image:url(/icons/shield.svg);mask-image:url(/icons/shield.svg)}
+.ic-sparkles{-webkit-mask-image:url(/icons/sparkles.svg);mask-image:url(/icons/sparkles.svg)}
+.ic-tools{-webkit-mask-image:url(/icons/tools.svg);mask-image:url(/icons/tools.svg)}
+.ic-users{-webkit-mask-image:url(/icons/users.svg);mask-image:url(/icons/users.svg)}

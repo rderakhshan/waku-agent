@@ -179,7 +179,7 @@ whatever its recorded tasks cost to run again.
 
 ## The embedded page
 
-The rail's **Laminar** entry (LLMOps) embeds Laminar's own UI. It cannot be
+The rail's **Trace and Eval** entry (LLMOps) embeds Laminar's own UI. It cannot be
 framed as shipped: Laminar sends `X-Frame-Options: DENY` and a CSP
 `frame-ancestors 'none'`, and Next.js bakes its asset paths at build time. So:
 

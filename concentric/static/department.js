@@ -74,22 +74,32 @@
   .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:1.6;stroke-dasharray:5 5;opacity:.34}
   .dep-peer.live{stroke:var(--warn,#b36b00);stroke-width:3.4;stroke-dasharray:none;opacity:1}
   .dep-card{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.6}
-  .dep-r0 .dep-card{fill:var(--accent,#1e4e8c);stroke:#0a1b3a}
+  /* Irina is the hub, not a warning: a neutral grey built from the theme's own
+     ink and ground, so it reads the same in every theme instead of inheriting
+     whichever accent the reader picked. */
+  .dep-r0 .dep-card{fill:color-mix(in srgb,var(--text-ink) 20%,var(--surface-bg));
+    stroke:var(--rule-hard)}
   .dep-r1 .dep-card{fill:var(--accent-soft,#eaf2fb);stroke:var(--accent,#1e4e8c)}
-  .dep-title{fill:var(--text,#0a1b3a);font-family:inherit;pointer-events:none}
-  .dep-r0 .dep-title{fill:#fff;font-weight:700}
+  .dep-title{fill:var(--text-ink);font-family:inherit;pointer-events:none}
+  .dep-r0 .dep-title{fill:var(--text-ink);font-weight:700}
   .dep-r1 .dep-title{font-weight:700;fill:var(--accent,#1e4e8c)}
   .dep-node.cold .dep-card{opacity:.42}
   .dep-node.cold .dep-title{opacity:.55}
   .dep-part rect{fill:var(--surface,#fff);stroke:var(--border,#9dc2e8);stroke-width:1.2;
     transform-box:fill-box;transform-origin:center}
   .dep-part text{fill:var(--muted,#5a6b80);font-family:inherit;pointer-events:none}
-  .dep-r0 .dep-part rect{fill:#2a63a8;stroke:#7fa8d6}
-  .dep-r0 .dep-part text{fill:#dbe8f7}
+  .dep-r0 .dep-part rect{fill:color-mix(in srgb,var(--text-ink) 10%,var(--surface-bg));
+    stroke:var(--rule)}
+  .dep-r0 .dep-part text{fill:var(--text-ink)}
   .dep-part.hot rect{fill:var(--warn,#b36b00);stroke:var(--warn,#b36b00);
     animation:dep-beat .55s ease-in-out 3}
   .dep-part.hot text{fill:#fff;font-weight:700}
-  .dep-node.beat .dep-card{stroke-width:4}
+  /* The border beats with the seat, not just thickens: an active node has to
+     read from across the graph, and a wider stroke that holds still is easy to
+     mistake for a selected one. Same rhythm as the chips inside it. */
+  @keyframes dep-card-beat{0%,100%{stroke-width:1.6}50%{stroke-width:5}}
+  .dep-node.beat .dep-card{stroke-width:4;
+    animation:dep-card-beat .62s ease-in-out infinite}
   .dep-node{cursor:pointer}
   .dep-bar{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-2)}
   .dep-hint{font-size:var(--text-xs);color:var(--text-faint)}
@@ -724,12 +734,12 @@
 
   function legend() {
     return `<div class="dep-legend">`
-      + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent,#1e4e8c)"></i>Irina</span>`
+      + `<span class="dep-key"><i class="dep-swatch" style="background:color-mix(in srgb,var(--text-ink) 20%,var(--surface-bg))"></i>Irina</span>`
       + `<span class="dep-key"><i class="dep-swatch" style="background:var(--accent-soft,#eaf2fb)"></i>CFO</span>`
       + `<span class="dep-key"><i class="dep-swatch"></i>worker</span>`
-      + `<span class="dep-key">every seat holds the same flow: gate - llm - tool - out</span>`
-      + `<span class="dep-key">solid line = delegation, one level down</span>`
-      + `<span class="dep-key">dashed line = peers; it lights when they consult</span>`
+      + `<span class="dep-key">${icon("loop", "ic-lead")}every seat holds the same flow: gate - llm - tool - out</span>`
+      + `<span class="dep-key">${icon("branch", "ic-lead")}solid line = delegation, one level down</span>`
+      + `<span class="dep-key">${icon("users", "ic-lead")}dashed line = peers; it lights when they consult</span>`
       + `</div>`;
   }
 
@@ -810,7 +820,7 @@
         <td class="meta">${(b.out || 0).toLocaleString()}</td>
         <td class="meta">${b.tool_calls || 0}</td>
         <td class="meta">${money(b.cost || 0)}</td></tr>`);
-    return `<h2>Spend by seat</h2>
+    return `<h2>${icon("chart", "ic-lead")}Spend by seat</h2>
       <div class="meta" style="margin-bottom:var(--space-3)">${esc(u.note || "")}</div>
       ${table(["seat", "LLM calls", "tokens in", "tokens out", "tool calls", "cost"], body)}`;
   }
@@ -824,7 +834,7 @@
         <td class="meta">${r.episodes || 0}</td>
         <td class="meta">${r.chat_log || 0}</td>
         <td class="meta">${kb(r.size || 0)}</td></tr>`);
-    return `<h2>Memory by seat</h2>
+    return `<h2>${icon("memory", "ic-lead")}Memory by seat</h2>
       <div class="meta" style="margin-bottom:var(--space-3)">Each seat owns its own state.db.
         The tables above are the union of all of them; this is who owns what.</div>
       ${table(["seat", "facts", "episodes", "chat rows", "state.db"], body)}`;
@@ -838,7 +848,7 @@
         <td class="meta">${esc(s.title || s.id || "")}</td>
         <td class="meta">${s.messages || 0}</td>
         <td class="meta">${esc(s.last_at || "")}</td></tr>`);
-    return `<h2>Conversations by seat</h2>
+    return `<h2>${icon("inbox", "ic-lead")}Conversations by seat</h2>
       <div class="meta" style="margin-bottom:var(--space-3)">Every seat keeps its own chat log.
         The inbox above is the union; this is which seat each thread belongs to.</div>
       ${table(["seat", "thread", "messages", "last"], body)}`;
@@ -865,14 +875,14 @@
         <td class="meta">${a.calls || 0}</td>
         <td class="meta">${money(a.cost || 0)}</td></tr>`;
     });
-    return `<h2>Seats that have run</h2>
+    return `<h2>${icon("users", "ic-lead")}Seats that have run</h2>
       ${table(["seat", "ring", "tools", "LLM calls", "cost"], body)}`;
   }
 
   VIEWS.department = (d) => {
     const dep = d.department;
     latest = d;
-    if (!dep) return uiCard(`<span class="empty">no department payload</span>`);
+    if (!dep) return uiCard(`<span class="empty">${icon("alert", "ic-lead")}no department payload</span>`);
     const built = dep.seats.filter((s) => s.built).length;
     const L = layout(dep);
     // After the DOM swaps in: re-apply the beats, and re-attach the view so a

@@ -243,7 +243,7 @@
       .sort((a, b) => b.worst.n - a.worst.n);
 
     if (!ranked.length) {
-      return uiCard(`<p class="lab-verdict">Nothing in the health instruments is
+      return uiCard(`<p class="lab-verdict">${icon("check", "ic-lead")}Nothing in the health instruments is
         above zero. No seat is repeating itself, stopping early, or breaking
         scope.</p>`);
     }
@@ -262,7 +262,7 @@
     const ownerText = (owner && owner.parent)
       ? `, who sits under ${owner.parent}` : "";
 
-    return uiCard(`<p class="lab-verdict"><b>${esc(seat)}</b> is the one to look
+    return uiCard(`<p class="lab-verdict">${icon("alert", "ic-lead")}<b>${esc(seat)}</b> is the one to look
       at: ${top.worst.n} of the department's ${share}
       ${esc(top.slot.unit)}${ownerText}.${tail}</p>`);
   }
@@ -371,12 +371,12 @@
   function recentRuns() {
     if (runs === null) {
       return uiCard(`<p class="meta">reading the trajectory index…</p>`,
-        { title: "Recent runs" });
+        { title: icon("clock", "ic-lead") + "Recent runs" });
     }
     if (!runs.length) {
-      return uiCard(`<p class="lab-quiet">No runs recorded yet. Tracing has to
+      return uiCard(`<p class="lab-quiet">${icon("inbox", "ic-lead")}No runs recorded yet. Tracing has to
         be on (IRINA_LAMINAR=1) for a run to land here.</p>`,
-        { title: "Recent runs" });
+        { title: icon("clock", "ic-lead") + "Recent runs" });
     }
     const body = runs.map((r) => `<div class="lab-flow">
         <code class="lab-flow-from">${esc(String(r.ts || "").slice(0, 19).replace("T", " "))}</code>
@@ -384,7 +384,7 @@
         <code class="lab-flow-to">${esc(r.entry || "?")}</code>
         <span class="lab-flow-note meta">${esc(r.trace_id || "")}</span>
       </div>`).join("");
-    return `<h2>Recent runs</h2>${body}`;
+    return `<h2>${icon("clock", "ic-lead")}Recent runs</h2>${body}`;
   }
 
   // --- the department tree ----------------------------------------------------
@@ -500,7 +500,7 @@
         <input type="checkbox" id="lab-problems"${problemsOnly ? " checked" : ""}>
         problems only</label></span>`;
 
-    return `<div class="lab-dept-head"><h2>The department</h2>
+    return `<div class="lab-dept-head"><h2>${icon("users", "ic-lead")}The department</h2>
         <span class="meta">${shown.length} of ${ordered.length} shown ·
           ${cols.length} of ${COLS.length + MORE_COLS.length} columns</span>${controls}</div>
       <div class="tbl-wrap"><table class="tbl lab-tree">${head}${body}</table></div>
@@ -637,7 +637,7 @@
 
     const more = rows.length > 10
       ? `<p class="lab-foot">${rows.length} pairs in all · showing the 10 worst.</p>` : "";
-    return `<h2>The hand-offs</h2>${body}${more}`;
+    return `<h2>${icon("branch", "ic-lead")}The hand-offs</h2>${body}${more}`;
   }
 
   // --- the gaps ---------------------------------------------------------------
@@ -648,8 +648,8 @@
   function gaps(rows) {
     const open = rows.filter((s) => s.value === null);
     if (!open.length) {
-      return uiCard(`<p class="lab-quiet">Every instrument holds a value.</p>`,
-        { title: "What we can't measure yet" });
+      return uiCard(`<p class="lab-quiet">${icon("check", "ic-lead")}Every instrument holds a value.</p>`,
+        { title: icon("alert", "ic-lead") + "What we can't measure yet" });
     }
     const body = open.map((s) => `<div class="lab-gap-row">
         <span class="lab-gap-box">${s.state === "placeholder" ? "[-]" : "[ ]"}</span>
@@ -664,7 +664,7 @@
     const m = d.metrics || {};
     const rows = Object.values(m);
     if (!rows.length) {
-      return uiCard(`<span class="empty">No registry in the payload. The launcher
+      return uiCard(`<span class="empty">${icon("alert", "ic-lead")}No registry in the payload. The launcher
         computes it in concentric/metrics.py; restart the server if this page is
         empty after an update.</span>`);
     }

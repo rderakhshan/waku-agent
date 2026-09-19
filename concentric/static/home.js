@@ -6,7 +6,7 @@
 //
 // The top block is the pitch. Under it: a billboard that cycles a bank of images
 // at random, and beside it the advert in words. The bank is whatever is in
-// assets/images/ — the dashboard reads the directory, so dropping a file in
+// assets/images/ â€” the dashboard reads the directory, so dropping a file in
 // there adds it to the rotation without anyone maintaining a carousel by hand.
 //
 // The two sit in one row measured to the space left under the hero, so the page
@@ -33,9 +33,9 @@
           Every seat is a full agent with its own memory, its own prompt and its own tools,
           and the rules between them are enforced in code rather than asked for in a prompt.</p>
         <div class="home-cta">
-          ${uiButton("Open the department", {
+          ${uiButton(icon("dashboard") + "Open the department", {
             level: "primary", onclick: "location.hash='#overview/multi'"})}
-          ${uiButton("The cockpit", {
+          ${uiButton(icon("gauge") + "The cockpit", {
             level: "secondary", onclick: "location.hash='#ops'"})}
         </div>
       </div>
@@ -47,10 +47,11 @@
     // page again, which is a request per render for nothing.
     let inner;
     if (routeError) {
-      inner = `<p class="billboard-empty">This dashboard predates the billboard
-        route — restart it to pick up <code>dashboard.py</code>.</p>`;
+      inner = `<p class="billboard-empty">${icon("refresh", "ic-lead")}This dashboard predates
+        the billboard route â€” restart it to pick up <code>dashboard.py</code>.</p>`;
     } else if (bank !== null && !bank.length) {
-      inner = `<p class="billboard-empty">No images in <code>assets/images/</code>.</p>`;
+      inner = `<p class="billboard-empty">${icon("image", "ic-lead")}No images in
+        <code>assets/images/</code>.</p>`;
     } else if (current) {
       inner = `<img class="billboard-img" src="${esc(current)}" alt="">`;
     } else {
@@ -96,16 +97,16 @@
           alt="The department graph: Irina at the centre, four CFOs around her, workers below."
           onerror="this.closest('figure').hidden = true">
       </figure>
-      ${beat(`<span class="ad-huge">24</span> seats, one department.`,
+      ${beat(`${icon("users", "ic-lead")}<span class="ad-huge">24</span> seats, one department.`,
              "One chief model risk officer, four CFOs and nineteen workers &mdash; every one a "
              + "full agent with its own memory, its own prompt and its own tools.")}
-      ${beat("The org chart is code.",
+      ${beat(`${icon("branch", "ic-lead")}The org chart is code.`,
              "Scope is the delegation tool's role enum and depth is a ring counter. A worker "
              + "holds no delegation tool at all, so a forbidden edge is absent, not refused.")}
-      ${beat("It runs on your machine.",
+      ${beat(`${icon("database", "ic-lead")}It runs on your machine.`,
              "One SQLite file per seat, under <code>.waku-concentric/agents/</code>. Traces, "
              + "memory and spend never leave the laptop.")}
-      ${beat("Watch it work, then prove it.",
+      ${beat(`${icon("chart", "ic-lead")}Watch it work, then prove it.`,
              "A live graph beats each seat as it runs, and the chords between CFOs turn solid "
              + "when they compare notes. Deterministic evals and an LLM judge sit behind one "
              + "release gate, so a fix ships with the case that would have caught it.")}

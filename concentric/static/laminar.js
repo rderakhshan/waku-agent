@@ -18,9 +18,9 @@
   const ID = "laminar-panel";
   const STYLE_ID = "irina-theme-bridge";
 
-  const PLACEHOLDER = `<p class="lab-quiet">Laminar opens in the panel over this
-    area. If it stays empty, the stack is not running — start it with
-    <code>laminar\\run.ps1</code>, then reload.</p>`;
+  const PLACEHOLDER = `<p class="lab-quiet">${icon("ops", "ic-lead")}Laminar opens
+    in the panel over this area. If it stays empty, the stack is not running —
+    start it with <code>laminar\\run.ps1</code>, then reload.</p>`;
 
   // --- reading Irina's palette ------------------------------------------------
   //

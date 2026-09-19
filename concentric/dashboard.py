@@ -134,6 +134,7 @@ def department_payload() -> dict:
 # There is no Department rail item: the department is the second tab of the
 # Overview page (see department.js), so the rail keeps one entry for both.
 _SCRIPT = ('<script src="/theme.js"></script>\n'
+           '<script src="/icons.js"></script>\n'
            '<script src="/home.js"></script>\n'
            '<script src="/observation.js"></script>\n'
            '<script src="/laminar.js"></script>\n'
@@ -183,6 +184,44 @@ _FOLDS = (
                           "database", "ops", "compare/models", "compare/memory")),
     ("setup", "Setup", ("models", "connections", "settings")),
 )
+
+
+# The rail's icons, by the page each row opens. A row with no icon keeps its
+# letter, so the rail still reads if one is ever missing.
+_RAIL_ICONS = {
+    "home": "home",
+    "overview": "dashboard",
+    "gateway": "gateway",
+    "loop": "loop",
+    "graph": "graph",
+    "memory": "memory",
+    "tools": "tools",
+    "database": "database",
+    "ops": "gauge",
+    "compare/models": "race",
+    "compare/memory": "race",
+    "models": "models",
+    "connections": "connections",
+    "settings": "settings",
+    "observation": "lab",
+    "laminar": "ops",
+}
+
+
+def _rail_icons(html: str) -> str:
+    """Put an icon at the head of each rail row.
+
+    Inserted into the anchor rather than drawn with `::before`, because the icon
+    differs per row and CSS cannot read a hash. One substitution per page, on
+    the opening tag, so the label and the count are left alone.
+    """
+    for page, icon in _RAIL_ICONS.items():
+        pattern = re.compile(r'(<a [^>]*href="#' + re.escape(page) + r'"[^>]*>)')
+        html = pattern.sub(
+            lambda m, icon=icon: (m.group(1)
+                                  + f'<i class="ic ic-{icon}" aria-hidden="true"></i>'),
+            html, count=1)
+    return html
 
 
 def _fold(html: str, key: str, label: str, pages: tuple[str, ...]) -> str:
@@ -241,15 +280,15 @@ def _rail(html: str) -> str:
     html = html.replace(
         '<a href="#compare/models"',
         '<a data-grp="llmops" hidden href="#laminar" data-v="laminar" '
-        'data-short="X" aria-label="Observability and Evaluation Lab">'
-        '<span class="lbl">Observability and Evaluation Lab</span></a>\n  '
+        'data-short="X" aria-label="Trace and Eval">'
+        '<span class="lbl">Trace and Eval</span></a>\n  '
         '<a data-grp="llmops" hidden href="#observation" data-v="observation" '
         'data-short="L" aria-label="Observation Lab">'
         '<span class="lbl">Observation Lab</span></a>\n  '
         '<a href="#compare/models"', 1)
     for key, label, pages in _FOLDS:
         html = _fold(html, key, label, pages)
-    return html
+    return _rail_icons(html)
 
 
 def _inject(html: str) -> str:
@@ -424,6 +463,10 @@ def _handler_class():
                 body = (Path(__file__).parent / "static" / "laminar.js").read_bytes()
                 self._frontend(body, "text/javascript")
                 return
+            if path == "/icons.js":
+                body = (Path(__file__).parent / "static" / "icons.js").read_bytes()
+                self._frontend(body, "text/javascript")
+                return
             if path == "/api/billboard":
                 # The bank is a directory, not a list: dropping a file into
                 # assets/images/ adds it to Home's rotation with no code change.
@@ -469,6 +512,25 @@ def _handler_class():
             if path == "/irina-mark.svg":
                 body = (Path(__file__).parent / "static" / "irina-mark.svg").read_bytes()
                 self._frontend(body, "image/svg+xml")
+                return
+            if path.startswith("/icons/") and path.endswith(".svg"):
+                # Vendored Lucide icons, served from here rather than fetched:
+                # the dashboard has to work with no network at all.
+                name = path[len("/icons/"):-len(".svg")]
+                target = Path(__file__).parent / "static" / "icons" / f"{name}.svg"
+                if "/" not in name and ".." not in name and target.is_file():
+                    body = target.read_bytes()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "image/svg+xml")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.send_header("Cache-Control", "max-age=3600")
+                    self.end_headers()
+                    try:
+                        self.wfile.write(body)
+                    except ABORTED:
+                        pass
+                    return
+                self.send_error(404)
                 return
             if path == "/ui.css":
                 body = (Path(__file__).parent / "static" / "ui.css").read_bytes()
