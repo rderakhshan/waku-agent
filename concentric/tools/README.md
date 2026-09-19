@@ -22,7 +22,7 @@ Two things worth knowing before adding one by hand:
   name, description and shape are read out of the source with `ast`, so a broken
   or hostile file cannot run just by being listed.
 - A tool runs inside the agent's own process with the agent's own reach. There is
-  no sandbox here, which is why the page makes a generated tool be read before it
-  can be handed to a seat.
+  no sandbox here, so read the source before handing one to a seat — the Market
+  card shows it under "What it actually does".
 
 Files beginning with `_` are ignored, so a shared helper can live here too.

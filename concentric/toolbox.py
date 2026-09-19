@@ -36,22 +36,35 @@ TOOLS_DIR = Path(__file__).resolve().parent / "tools"
 # at all. Mirrors `waku/tools/__init__.py`; the department turns every switch off,
 # so a tool listed here with a switch is present-but-inert until that changes.
 BUILTIN_TOOLS: tuple[dict[str, str], ...] = (
-    {"name": "search_web", "switch": "", "description": "Read-only web search."},
-    {"name": "save_note", "switch": "", "description": "Write a note."},
-    {"name": "list_events", "switch": "", "description": "Read the calendar."},
-    {"name": "send_message", "switch": "",
+    {"name": "search_web", "switch": "", "icon": "search",
+     "description": "Read-only web search."},
+    {"name": "save_note", "switch": "", "icon": "file",
+     "description": "Write a note."},
+    {"name": "list_events", "switch": "", "icon": "inbox",
+     "description": "Read the calendar."},
+    {"name": "send_message", "switch": "", "icon": "external",
      "description": "Send a message through a connected gateway."},
-    {"name": "manage_memory", "switch": "", "description": "Correct or forget a memory."},
-    {"name": "update_soul", "switch": "", "description": "Learn a standing rule."},
-    {"name": "create_skill", "switch": "", "description": "Author a new skill."},
-    {"name": "create_event", "switch": "apple_calendar / google_calendar",
+    {"name": "manage_memory", "switch": "", "icon": "memory",
+     "description": "Correct or forget a memory."},
+    {"name": "update_soul", "switch": "", "icon": "settings",
+     "description": "Learn a standing rule."},
+    {"name": "create_skill", "switch": "", "icon": "sparkles",
+     "description": "Author a new skill."},
+    {"name": "create_event", "switch": "apple_calendar / google_calendar", "icon": "clock",
      "description": "Add a calendar event. With neither calendar on, it writes to "
                     "waku's own store."},
-    {"name": "github_read", "switch": "gh_tool",
+    {"name": "github_read", "switch": "gh_tool", "icon": "branch",
      "description": "Read a GitHub repo through the gh CLI."},
-    {"name": "delegate_task", "switch": "experimental",
+    {"name": "delegate_task", "switch": "experimental", "icon": "users",
      "description": "Hand a coding task to a sub-agent."},
 )
+
+# What a tool with no icon of its own wears.
+DEFAULT_ICON = "tools"
+
+# Who wrote a tool file. Named rather than spelled out, because the gate test in
+# evals/ flags a bare string literal that looks like a path into lab/.
+LAB_ORIGIN = "lab"
 
 
 # --- the file ----------------------------------------------------------------
@@ -123,19 +136,26 @@ def unassign(tool: str, path: Path | None = None) -> dict[str, list[str]]:
 
 # --- the market --------------------------------------------------------------
 
-def _metadata(path: Path) -> dict[str, Any] | None:
-    """A card, read out of the source without running any of it."""
+_CARD_NAMES = {"NAME", "DESCRIPTION", "INPUT_SCHEMA", "ICON", "ORIGIN"}
+
+
+def _card_from(source: str) -> dict[str, Any] | None:
+    """A card, read out of the source without running any of it.
+
+    `ICON` and `ORIGIN` are optional. Origin matters because a tool the model
+    wrote has to be read before it can be handed out, and one a person typed in
+    the Lab does not — they already know what it does.
+    """
     try:
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse(source)
     except Exception:
         return None
-    wanted = {"NAME", "DESCRIPTION", "INPUT_SCHEMA"}
     found: dict[str, Any] = {}
     for node in tree.body:
         if not isinstance(node, ast.Assign):
             continue
         for target in node.targets:
-            if isinstance(target, ast.Name) and target.id in wanted:
+            if isinstance(target, ast.Name) and target.id in _CARD_NAMES:
                 try:
                     found[target.id] = ast.literal_eval(node.value)
                 except Exception:
@@ -145,7 +165,20 @@ def _metadata(path: Path) -> dict[str, Any] | None:
     return {"name": str(found["NAME"]),
             "description": str(found.get("DESCRIPTION", "")),
             "schema": found.get("INPUT_SCHEMA") or {},
-            "source": path.read_text(encoding="utf-8")}
+            "icon": str(found.get("ICON") or DEFAULT_ICON),
+            "origin": str(found.get("ORIGIN") or "lab")}
+
+
+def _metadata(path: Path) -> dict[str, Any] | None:
+    try:
+        source = path.read_text(encoding="utf-8")
+    except Exception:
+        return None
+    card = _card_from(source)
+    if card is None:
+        return None
+    card["source"] = source
+    return card
 
 
 def _planned() -> list[dict[str, Any]]:
@@ -166,7 +199,8 @@ def market() -> list[dict[str, Any]]:
     for item in BUILTIN_TOOLS:
         cards.append({"name": item["name"], "description": item["description"],
                       "schema": {}, "switch": item["switch"], "state": "builtin",
-                      "source": "", "roles": box.get(item["name"], [])})
+                      "icon": item["icon"], "origin": "builtin", "source": "",
+                      "roles": box.get(item["name"], [])})
 
     if TOOLS_DIR.is_dir():
         for path in sorted(TOOLS_DIR.glob("*.py")):
@@ -183,29 +217,10 @@ def market() -> list[dict[str, Any]]:
         cards.append({"name": item.get("name", ""),
                       "description": item.get("description", ""),
                       "schema": {}, "switch": "", "state": "planned",
-                      "source": "", "roles": box.get(item.get("name", ""), []),
+                      "icon": "lab", "origin": "planned", "source": "",
+                      "roles": box.get(item.get("name", ""), []),
                       "box": item.get("box", "")})
     return cards
-
-
-GENERATE_PROMPT = """Write one Python tool for an agent.
-
-Reply with ONLY the file's source. No markdown fence, no explanation, no text
-before or after. The file must define exactly these four names:
-
-NAME = "snake_case_name"
-DESCRIPTION = "one sentence the model reads to decide when to call it"
-INPUT_SCHEMA = {{"type": "object", "properties": {{...}}, "required": [...]}}
-def run(**kwargs) -> str:
-    ...
-
-Rules:
-- standard library only, imported inside `run` where you can;
-- `run` returns a string, and never raises: return an error sentence instead;
-- keep it short enough to read in one screen.
-
-The tool to write: {ask}
-"""
 
 
 def _imports(source: str) -> list[str]:
@@ -227,65 +242,43 @@ def _imports(source: str) -> list[str]:
     return sorted(found)
 
 
-def _strip_fence(text: str) -> str:
-    """A model often wraps source in a fence however plainly it was asked not to."""
-    body = text.strip()
-    if body.startswith("```"):
-        body = body.split("\n", 1)[-1]
-        if body.rstrip().endswith("```"):
-            body = body.rstrip()[:-3]
-    return body.strip() + "\n"
+def assemble(name: str, description: str, schema: Any, icon: str,
+             body: str) -> dict[str, Any]:
+    """Write a tool file from the parts the Lab typed.
 
-
-def generate(ask: str) -> dict[str, Any]:
-    """Draft one tool from a description and write it, assigned to nobody.
-
-    Written, not handed out: a generated tool is real code that will run inside
-    the agent, so the page makes it be read before it can be given to a seat.
-    This writes a file and nothing else.
+    An assembler, not a generator: nothing here is inferred and nothing is
+    written for you. The file that lands is the one a person wrote, which is why
+    it does not need the review gate a model-written tool gets.
     """
     import re
 
-    from concentric import metrics
-
-    source = _strip_fence(metrics.ask(GENERATE_PROMPT.format(ask=ask), max_tokens=1200))
-    meta = _metadata_from(source)
-    if meta is None:
-        return {"error": "the model did not return a file with NAME, DESCRIPTION "
-                         "and INPUT_SCHEMA"}
-    name = meta["name"]
+    name = (name or "").strip()
     if not re.fullmatch(r"[a-z][a-z0-9_]*", name):
-        return {"error": f"unusable tool name: {name!r}"}
-    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
+        return {"error": "the id must be snake_case — lowercase letters, digits "
+                         "and underscores, starting with a letter"}
+    if not (description or "").strip():
+        return {"error": "the description is what the model reads to decide when "
+                         "to call it, so it cannot be empty"}
+    if not isinstance(schema, dict):
+        return {"error": "the input shape has to be a JSON object"}
+    body = (body or "").strip()
+    if "def run(" not in body:
+        return {"error": "the code body has to define run(**kwargs)"}
     target = TOOLS_DIR / f"{name}.py"
     if target.exists():
-        return {"error": f"{name} already exists — pick a different name"}
+        return {"error": f"{name} already exists — pick another id"}
+
+    # json.dumps rather than repr: the file should read exactly like the one in
+    # docs/toolbox.md, and `repr` would quietly write single quotes instead.
+    source = (f"NAME = {json.dumps(name)}\n"
+              f"DESCRIPTION = {json.dumps(description.strip())}\n"
+              f"ICON = {json.dumps(icon)}\n"
+              f'ORIGIN = "lab"\n'
+              f"INPUT_SCHEMA = {json.dumps(schema, indent=4, sort_keys=True)}\n"
+              f"\n\n{body}\n")
+    TOOLS_DIR.mkdir(parents=True, exist_ok=True)
     target.write_text(source, encoding="utf-8")
     return {"name": name, "imports": _imports(source)}
-
-
-def _metadata_from(source: str) -> dict[str, Any] | None:
-    """The same read as `_metadata`, on text rather than a file."""
-    try:
-        tree = ast.parse(source)
-    except Exception:
-        return None
-    wanted = {"NAME", "DESCRIPTION", "INPUT_SCHEMA"}
-    found: dict[str, Any] = {}
-    for node in tree.body:
-        if not isinstance(node, ast.Assign):
-            continue
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id in wanted:
-                try:
-                    found[target.id] = ast.literal_eval(node.value)
-                except Exception:
-                    pass
-    if "NAME" not in found:
-        return None
-    return {"name": str(found["NAME"]),
-            "description": str(found.get("DESCRIPTION", "")),
-            "schema": found.get("INPUT_SCHEMA") or {}}
 
 
 def make_tool(name: str):

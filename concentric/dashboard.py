@@ -703,7 +703,7 @@ def _handler_class():
             """
             if self._proxy_laminar():
                 return
-            if self.path.split("?", 1)[0] in ("/api/toolbox", "/api/toolbox/generate"):
+            if self.path.split("?", 1)[0] in ("/api/toolbox", "/api/toolbox/lab"):
                 # Two writes: who holds a tool, and a new tool drafted from a
                 # description. The draft lands unassigned, always.
                 from concentric import toolbox
@@ -713,10 +713,22 @@ def _handler_class():
                     payload = json.loads(self.rfile.read(length) or b"{}")
                 except Exception:
                     payload = {}
-                if self.path.split("?", 1)[0].endswith("/generate"):
-                    ask = str(payload.get("ask") or "").strip()
-                    body = ({"error": "describe the tool first"} if not ask
-                            else toolbox.generate(ask))
+                if self.path.split("?", 1)[0].endswith("/lab"):
+                    # The shape arrives as text from a textarea, so it is parsed
+                    # here — a malformed one is the reader's typo to fix, not a
+                    # tool with a nonsense schema.
+                    raw = payload.get("schema")
+                    if isinstance(raw, str):
+                        try:
+                            raw = json.loads(raw or "{}")
+                        except Exception:
+                            raw = None
+                    body = toolbox.assemble(
+                        str(payload.get("id") or ""),
+                        str(payload.get("description") or ""),
+                        raw,
+                        str(payload.get("icon") or toolbox.DEFAULT_ICON),
+                        str(payload.get("body") or ""))
                     if not body.get("error"):
                         body = {**body, "tools": toolbox.market()}
                 else:

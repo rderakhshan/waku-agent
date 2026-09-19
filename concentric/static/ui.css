@@ -925,18 +925,46 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .ic-users{-webkit-mask-image:url(/icons/users.svg);mask-image:url(/icons/users.svg)}
 
 /* ---- the tool market.
-   A card per tool, and on it the ticks that decide who may hold it. */
-.tool-ring{display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-2);
-  margin:var(--space-2) 0}
-.tool-ring-l{font-family:var(--face-mono);font-size:var(--text-xs);
-  text-transform:uppercase;letter-spacing:var(--tracking-label);color:var(--text-faint);
-  min-width:7ch}
+   A tool card borrows the Connections anatomy — tile, state pill, description,
+   action row — so a tool reads like everything else you connect. The tile is a
+   mask icon rather than an <img>: a drawing that takes the text colour is the
+   only kind that can follow all thirty-four themes. */
+.tool-tile{display:grid;place-items:center;font-size:20px;color:var(--text-ink);
+  background:var(--surface-paper);border:var(--rule-width) solid var(--rule)}
+/* Holders are chips, not a list of ticks: a specialised tool has one owner, so
+   the normal state of this row is a name and a "+". */
+.tool-chip{display:inline-flex;align-items:center;gap:calc(var(--spacing) * 0.5);
+  padding:1px 2px 1px calc(var(--spacing) * 1);
+  border:var(--rule-width) solid var(--rule);border-radius:var(--shape-chip,999px);
+  font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-ink)}
+.tool-x{border:0;background:transparent;color:var(--text-faint);cursor:pointer;
+  padding:0 calc(var(--spacing) * 0.5);line-height:1}
+.tool-x:hover{color:var(--bad)}
 .tool-pick{display:inline-flex;align-items:center;gap:calc(var(--spacing) * 0.5);
   font-size:var(--text-xs);color:var(--text-muted);cursor:pointer}
-.tool-pick code{font-family:var(--face-mono);font-size:var(--text-xs);color:var(--text-ink)}
+/* the lab's builder, which lives in a dialog so the 5s re-render cannot wipe it */
+.dialog .fld textarea{width:100%;font-family:var(--face-mono);font-size:var(--text-xs);
+  line-height:1.45;background:var(--surface-paper);color:var(--text-ink);
+  border:var(--rule-width) solid var(--rule);border-radius:var(--radius,8px);
+  padding:var(--space-2);resize:vertical}
 .tool-src{margin:var(--space-2) 0}
 .tool-src summary{font-size:var(--text-xs);color:var(--text-muted);cursor:pointer}
 .tool-src pre{margin:var(--space-2) 0 0;padding:var(--space-2);overflow:auto;max-height:280px;
   border:var(--rule-width) solid var(--rule);border-radius:var(--radius,8px);
   background:var(--surface-paper);font-family:var(--face-mono);font-size:var(--text-xs);
   color:var(--text-ink);line-height:1.45}
+
+/* Holders wrap, and the extras are counted: a card is not a place to print a
+   department, so beyond a couple of names the rest are a number. */
+.tool-holders{display:flex;flex-wrap:wrap;gap:calc(var(--spacing) * 0.5);max-width:100%}
+.tool-more{cursor:help;color:var(--text-muted)}
+/* the lab's argument rows — one line per argument, assembled into a schema */
+.arg-row{display:grid;grid-template-columns:minmax(90px,1fr) 96px minmax(110px,1.4fr) auto auto;
+  gap:calc(var(--spacing) * 0.5);align-items:center;margin-bottom:calc(var(--spacing) * 0.5)}
+.arg-row input,.arg-row select{font-family:var(--face-mono);font-size:var(--text-xs);
+  background:var(--surface-paper);color:var(--text-ink);
+  border:var(--rule-width) solid var(--rule);border-radius:var(--radius-sm,4px);
+  padding:calc(var(--spacing) * 0.5);min-width:0}
+.ic-plus{-webkit-mask-image:url(/icons/plus.svg);mask-image:url(/icons/plus.svg)}
+.ic-minus{-webkit-mask-image:url(/icons/minus.svg);mask-image:url(/icons/minus.svg)}
+.ic-trash{-webkit-mask-image:url(/icons/trash.svg);mask-image:url(/icons/trash.svg)}

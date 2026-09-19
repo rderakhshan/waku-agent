@@ -105,22 +105,88 @@ def test_a_private_file_is_skipped(tmp_path, monkeypatch):
 
 # --- the parts of generation that need no model ------------------------------
 
-def test_a_fenced_reply_is_unwrapped():
-    assert toolbox._strip_fence("```python\nX = 1\n```") == "X = 1\n"
-
-
 def test_imports_are_reported_so_a_reader_can_see_them():
     src = "import json\nfrom pathlib import Path\ndef run(**k):\n    return ''\n"
     assert toolbox._imports(src) == ["json", "pathlib"]
 
 
-def test_metadata_from_text_reads_the_three_names():
-    meta = toolbox._metadata_from(RAISER)
+def test_a_card_reads_from_text_as_well_as_a_file():
+    meta = toolbox._card_from(RAISER)
     assert meta is not None
     assert meta["name"] == "boom_tool"
     assert meta["schema"] == {"type": "object", "properties": {}}
+    assert meta["origin"] == toolbox.LAB_ORIGIN   # no ORIGIN line means a person wrote it
 
 
-def test_metadata_from_text_gives_up_on_rubbish():
-    assert toolbox._metadata_from("not python at all ((") is None
-    assert toolbox._metadata_from("X = 1\n") is None
+def test_a_card_gives_up_on_rubbish():
+    assert toolbox._card_from("not python at all ((") is None
+    assert toolbox._card_from("X = 1\n") is None
+
+
+# --- the lab -----------------------------------------------------------------
+#
+# The lab is an assembler, not a generator: it writes the parts a person typed.
+# That is why a tool built there needs no review gate, and why every way of
+# getting those parts wrong has to come back as a sentence rather than a file.
+
+def _lab(tmp_path, monkeypatch, **over):
+    monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
+    parts = {"name": "ok_tool", "description": "does a thing",
+             "schema": {"type": "object", "properties": {}}, "icon": "tools",
+             "body": "def run(**kwargs) -> str:\n    return ''\n"}
+    parts.update(over)
+    return toolbox.assemble(parts.pop("name"), parts.pop("description"),
+                            parts.pop("schema"), parts.pop("icon"),
+                            parts.pop("body"))
+
+
+def test_the_lab_assembles_a_tool_from_its_parts(tmp_path, monkeypatch):
+    assert _lab(tmp_path, monkeypatch, name="lookup_rate", icon="chart").get("name") \
+        == "lookup_rate"
+    card = {c["name"]: c for c in toolbox.market()}["lookup_rate"]
+    assert card["icon"] == "chart"
+    assert card["origin"] == toolbox.LAB_ORIGIN
+    assert card["state"] == "generated"
+    assert card["description"] == "does a thing"
+
+
+def test_a_tool_built_in_the_lab_is_still_assigned_to_nobody(tmp_path, monkeypatch):
+    _lab(tmp_path, monkeypatch)
+    assert toolbox.load(tmp_path / "box.json") == {}
+
+
+def test_a_model_written_tool_is_stamped_so_the_gate_can_find_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
+    (tmp_path / "made_up.py").write_text(
+        'ORIGIN = "model"\n' + RAISER.replace("boom_tool", "made_up"), encoding="utf-8")
+    card = {c["name"]: c for c in toolbox.market()}["made_up"]
+    assert card["origin"] == "model"
+
+
+def test_an_id_that_is_not_snake_case_is_refused(tmp_path, monkeypatch):
+    assert "snake_case" in _lab(tmp_path, monkeypatch, name="Not A Name")["error"]
+
+
+def test_a_missing_description_is_refused(tmp_path, monkeypatch):
+    assert "description" in _lab(tmp_path, monkeypatch, description="   ")["error"]
+
+
+def test_a_body_without_run_is_refused(tmp_path, monkeypatch):
+    assert "run(" in _lab(tmp_path, monkeypatch, body="x = 1\n")["error"]
+
+
+def test_a_shape_that_is_not_an_object_is_refused(tmp_path, monkeypatch):
+    assert "JSON object" in _lab(tmp_path, monkeypatch, schema=None)["error"]
+
+
+def test_an_id_already_in_use_is_refused(tmp_path, monkeypatch):
+    _lab(tmp_path, monkeypatch)
+    assert "already exists" in _lab(tmp_path, monkeypatch)["error"]
+
+
+def test_the_assembled_file_is_the_contract_and_nothing_else(tmp_path, monkeypatch):
+    _lab(tmp_path, monkeypatch, name="tiny", icon="check")
+    source = (tmp_path / "tiny.py").read_text(encoding="utf-8")
+    for line in ('NAME = "tiny"', 'ICON = "check"', 'ORIGIN = "lab"', "INPUT_SCHEMA"):
+        assert line in source
+    assert "def run(" in source
