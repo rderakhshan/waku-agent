@@ -225,6 +225,53 @@ def _rail_icons(html: str) -> str:
     return html
 
 
+# Rows this launcher renames. waku's shell is not ours to edit, so the label is
+# rewritten on the way through — the same string surgery the folds already do.
+_RAIL_NAMES = {"tools": "Tools &amp; MCPs"}
+
+# Rows this launcher moves. Everything not named here keeps its place, so this
+# stays a rearrangement rather than a second opinion about the whole rail.
+_RAIL_ORDER = ("tools", "memory", "graph")
+
+
+def _rail_anchor(page: str) -> re.Pattern:
+    return re.compile(r'<a [^>]*href="#' + re.escape(page) + r'"[^>]*>.*?</a>', re.DOTALL)
+
+
+def _rename(html: str, names: dict[str, str]) -> str:
+    for page, label in names.items():
+        pattern = _rail_anchor(page)
+        match = pattern.search(html)
+        if not match:
+            continue
+        row = match.group(0)
+        renamed = re.sub(r'(<span class="lbl">)[^<]*(</span>)',
+                         lambda m, label=label: m.group(1) + label + m.group(2),
+                         row, count=1)
+        renamed = re.sub(r'aria-label="[^"]*"', f'aria-label="{label}"', renamed, count=1)
+        html = html.replace(row, renamed, 1)
+    return html
+
+
+def _reorder(html: str, order: tuple[str, ...]) -> str:
+    """Move these rows into this order, where the first of them already sat.
+
+    All or nothing: if any row is missing the rail is left alone, because a
+    half-applied rearrangement is harder to read than the shell's own order.
+    """
+    found = []
+    for page in order:
+        match = _rail_anchor(page).search(html)
+        if not match:
+            return html
+        found.append((match.start(), page, match.group(0)))
+    at = min(start for start, _, _ in found)
+    for _, _, row in found:
+        html = html.replace(row, "", 1)
+    block = "\n  ".join(row for _, _, row in sorted(found, key=lambda f: order.index(f[1])))
+    return html[:at] + block + html[at:]
+
+
 def _fold(html: str, key: str, label: str, pages: tuple[str, ...]) -> str:
     """Turn a heading and the rows under it into a fold.
 
@@ -287,6 +334,9 @@ def _rail(html: str) -> str:
         'data-short="L" aria-label="Observation Lab">'
         '<span class="lbl">Observation Lab</span></a>\n  '
         '<a href="#compare/models"', 1)
+    # First, so the folds and the icons work on rows already in their last place.
+    html = _reorder(html, _RAIL_ORDER)
+    html = _rename(html, _RAIL_NAMES)
     for key, label, pages in _FOLDS:
         html = _fold(html, key, label, pages)
     return _rail_icons(html)
