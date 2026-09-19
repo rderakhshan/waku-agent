@@ -725,6 +725,7 @@ def _handler_class():
 
                 self._send(json.dumps({
                     "tools": toolbox.market(),
+                    "basics": toolbox.basics(),
                     "roles": [{"role": s.role, "title": s.title, "ring": s.ring,
                                "parent": s.parent} for s in roster.SEATS],
                 }).encode("utf-8"), "application/json", no_cache=True)
@@ -753,7 +754,8 @@ def _handler_class():
             """
             if self._proxy_laminar():
                 return
-            if self.path.split("?", 1)[0] in ("/api/toolbox", "/api/toolbox/lab"):
+            if self.path.split("?", 1)[0] in ("/api/toolbox", "/api/toolbox/lab",
+                                              "/api/toolbox/kind"):
                 # Two writes: who holds a tool, and a new tool drafted from a
                 # description. The draft lands unassigned, always.
                 from concentric import toolbox
@@ -778,9 +780,17 @@ def _handler_class():
                         str(payload.get("description") or ""),
                         raw,
                         str(payload.get("icon") or toolbox.DEFAULT_ICON),
-                        str(payload.get("body") or ""))
+                        str(payload.get("body") or ""),
+                        str(payload.get("kind") or toolbox.SPECIAL))
                     if not body.get("error"):
-                        body = {**body, "tools": toolbox.market()}
+                        body = {**body, "tools": toolbox.market(),
+                                "basics": toolbox.basics()}
+                elif self.path.split("?", 1)[0].endswith("/kind"):
+                    body = toolbox.set_kind(str(payload.get("tool") or ""),
+                                            str(payload.get("kind") or ""))
+                    if not body.get("error"):
+                        body = {**body, "tools": toolbox.market(),
+                                "basics": toolbox.basics()}
                 else:
                     tool = str(payload.get("tool") or "")
                     roles = payload.get("roles") or []

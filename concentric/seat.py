@@ -220,14 +220,16 @@ def build_seat(spec: roster.SeatSpec, *, config: dict[str, Any],
     from concentric import toolbox
 
     granted = toolbox.tools_for(spec.role)
-    keep = set(BASE_TOOLS) | set(granted)
+    # A basic tool joins the floor: every seat holds it without anyone granting
+    # it, which is the whole difference between basic and specialised.
+    keep = set(BASE_TOOLS) | set(granted) | set(toolbox.basic_tools())
     for name in list(app.tools._tools):
         if name not in keep:
             del app.tools._tools[name]
 
     # A generated tool was never in waku's registry, so the ones this seat holds
     # are imported and added here. This is the only place generated code runs.
-    for name in granted:
+    for name in sorted(set(granted) | set(toolbox.basic_tools())):
         if name not in app.tools._tools:
             tool = toolbox.make_tool(name)
             if tool is not None:

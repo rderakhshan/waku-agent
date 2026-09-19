@@ -98,7 +98,9 @@
     } else {
       actions = `${chips(t)}
         <button type="button" class="btn btn-secondary btn-sm"
-          onclick="toolGive(this,'${t.name}')">${icon("plus", "ic-lead")}Assign</button>`;
+          onclick="toolGive(this,'${t.name}')">${icon("plus", "ic-lead")}Assign</button>
+        ${t.origin === "lab" ? `<button type="button" class="btn btn-tertiary btn-sm"
+          onclick="toolKind('${t.name}','basic')">Make it basic</button>` : ""}`;
     }
     return uiCard(
       `<span class="provlogo tool-tile">${icon(t.icon || "tools")}</span>
@@ -208,6 +210,31 @@
     save(name, []);
   };
 
+  // Moving a tool between the floor and the market. Basic is the higher-privilege
+  // direction — it hands the tool to all twenty-four seats at once — so the note
+  // says so plainly rather than reporting a count.
+  window.toolKind = async (name, kind) => {
+    try {
+      const res = await fetch("/api/toolbox/kind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool: name, kind }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        note = data.error;
+      } else {
+        box = { tools: data.tools, basics: data.basics, roles: box.roles };
+        note = kind === "basic"
+          ? `${name} is basic now — every seat has it`
+          : `${name} is in the Market now`;
+      }
+    } catch (e) {
+      note = String(e);
+    }
+    if (typeof render === "function") render();
+  };
+
   window.toolAdd = (name, role) => {
     closeMenu();
     const t = byName(name);
@@ -229,6 +256,11 @@
       <label class="fld"><span>icon</span>
         <select id="lab-icon">${
           ICONS.map((n) => `<option value="${n}">${n}</option>`).join("")}</select></label>
+      <label class="fld"><span>who gets it</span>
+        <select id="lab-kind">
+          <option value="special">specialised — to the Market, then assign it to a seat</option>
+          <option value="basic">basic — every seat gets it, no assigning</option>
+        </select></label>
       <div class="fld"><span>arguments the model may pass</span>
         <div id="lab-args">${argRow()}</div>
         <button type="button" class="btn btn-tertiary btn-sm"
@@ -284,16 +316,20 @@
           id: val("lab-id").trim(),
           description: val("lab-desc").trim(),
           icon: val("lab-icon") || "tools",
+          kind: val("lab-kind") || "special",
           schema: { type: "object", properties, required },
           body: val("lab-body"),
         }),
       });
       const data = await res.json();
       if (data.error) { err(data.error); return; }
+      const basic = val("lab-kind") === "basic";
       closeDialog();
-      note = `${data.name} created — give it to a seat`;
+      note = basic
+        ? `${data.name} created — every seat has it`
+        : `${data.name} created — give it to a seat`;
       await load();
-      location.hash = "#tools/market";
+      location.hash = basic ? "#tools" : "#tools/market";
     } catch (e) {
       err(String(e));
     }
@@ -315,10 +351,10 @@
     other: "Other",
   };
 
-  function availableCard(item) {
-    // No pill here. This list comes from the department's own payload, which
-    // already writes the holders into the description — a pill would repeat it,
-    // and the two sources do not count the same thing.
+  function catalogCard(item) {
+    // No pill: this list comes from the department's own payload, which already
+    // writes the holders into the description, and two sources counting the same
+    // thing is how they end up disagreeing.
     const t = (box && box.tools ? box.tools : []).find((x) => x.name === item.name);
     return uiCard(
       `<span class="provlogo tool-tile">${icon((t && t.icon) || "tools")}</span>
@@ -326,36 +362,62 @@
       { title: esc(item.name), cls: "provcard conncard" });
   }
 
-  function available(d) {
+  // A tool on the floor. It is here because everyone has it — either because
+  // waku ships it or because it was built as basic — so there is nothing to
+  // assign, and the only action worth offering is the way back out.
+  function floorCard(t) {
+    const built = t.origin === "lab";
+    const action = built
+      ? `<div class="provactions connactions">
+           <button type="button" class="btn btn-secondary btn-sm"
+             onclick="toolKind('${t.name}','special')">Move to the Market</button></div>`
+      : `<div class="provactions connactions">
+           <span class="connwhy">ships with waku</span></div>`;
+    return uiCard(
+      `<span class="provlogo tool-tile">${icon(t.icon || "tools")}</span>
+       <div class="connstatus connected"><span class="conndot"></span>every seat</div>
+       <div class="conndesc">${esc(t.description || "")}</div>${action}`,
+      { title: esc(t.name), cls: "provcard conncard" });
+  }
+
+  function basicTools(d) {
     if (box === null) setTimeout(load, 0);
-    const catalog = (d.tools && d.tools.catalog) || [];
+    const floor = (box && box.basics) || [];
+    const onFloor = new Set(floor.map((t) => t.name));
+    const catalog = ((d.tools && d.tools.catalog) || [])
+      .filter((c) => !onFloor.has(c.name));
     const order = ["flagship", "web", "self-management", "apple", "mcp", "other"];
     const keys = order.concat(catalog.map((c) => c.source).filter((s) => !order.includes(s)));
-    let html = `<h2>${icon("tools", "ic-lead")}Available</h2>
-      <p class="home-p">What the agent can call this turn: a name and a description
-      the model reads, a shape for the arguments, and a Python function. Tools that
-      are only planned are in the Market.</p>`;
+
+    let html = `<h2>${icon("tools", "ic-lead")}Basic Tools</h2>
+      <p class="home-p">The floor: what every seat can call before anything is
+      assigned, plus whatever you build as basic in the LAB. Nothing here is
+      assigned, because there is no seat without it.</p>`;
+    if (floor.length) {
+      html += `<section class="connsection"><h2>Every seat</h2>
+        <div class="provgrid conngrid">${floor.map(floorCard).join("")}</div></section>`;
+    }
     for (const key of keys) {
       const items = catalog.filter((c) => c.source === key);
       if (!items.length) continue;
       html += `<section class="connsection"><h2>${esc(SRC_LABEL[key] || key)}</h2>
-        <div class="provgrid conngrid">${items.map(availableCard).join("")}</div></section>`;
+        <div class="provgrid conngrid">${items.map(catalogCard).join("")}</div></section>`;
     }
     return html;
   }
 
   VIEWS.tools = (d, sub) => {
     const tabs = uiTabs([
-      { label: "Available", href: "#tools", on: !sub },
-      { label: "Results", href: "#tools/results", on: sub === "results" },
-      { label: "Market", href: "#tools/market", on: sub === "market" },
       { label: "LAB", href: "#tools/lab", on: sub === "lab" },
+      { label: "Basic Tools", href: "#tools", on: !sub },
+      { label: "Market", href: "#tools/market", on: sub === "market" },
+      { label: "Results", href: "#tools/results", on: sub === "results" },
       { label: "MCP", href: "#tools/mcp", on: sub === "mcp" },
     ]);
-    if (sub === "results") return tabs + toolsResults(d);
-    if (sub === "market") return tabs + market();
     if (sub === "lab") return tabs + labTab();
+    if (sub === "market") return tabs + market();
+    if (sub === "results") return tabs + toolsResults(d);
     if (sub === "mcp") return tabs + toolsMCP(d.tools || {});
-    return tabs + available(d);
+    return tabs + basicTools(d);
   };
 })();

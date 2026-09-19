@@ -136,7 +136,13 @@ def unassign(tool: str, path: Path | None = None) -> dict[str, list[str]]:
 
 # --- the market --------------------------------------------------------------
 
-_CARD_NAMES = {"NAME", "DESCRIPTION", "INPUT_SCHEMA", "ICON", "ORIGIN"}
+_CARD_NAMES = {"NAME", "DESCRIPTION", "INPUT_SCHEMA", "ICON", "ORIGIN", "KIND"}
+
+# What a tool is for. `special` is the safe default: it reaches one seat because
+# someone said so. `basic` joins the floor and every seat holds it at once, which
+# is why it is a deliberate choice on the form rather than something inferred.
+BASIC = "basic"
+SPECIAL = "special"
 
 
 def _card_from(source: str) -> dict[str, Any] | None:
@@ -166,7 +172,8 @@ def _card_from(source: str) -> dict[str, Any] | None:
             "description": str(found.get("DESCRIPTION", "")),
             "schema": found.get("INPUT_SCHEMA") or {},
             "icon": str(found.get("ICON") or DEFAULT_ICON),
-            "origin": str(found.get("ORIGIN") or "lab")}
+            "origin": str(found.get("ORIGIN") or LAB_ORIGIN),
+            "kind": str(found.get("KIND") or SPECIAL)}
 
 
 def _metadata(path: Path) -> dict[str, Any] | None:
@@ -213,8 +220,8 @@ def market() -> list[dict[str, Any]]:
             if path.name.startswith("_"):
                 continue
             meta = _metadata(path)
-            if meta is None:
-                continue
+            if meta is None or meta.get("kind") == BASIC:
+                continue  # basic tools belong to the floor, not to the market
             meta.update({"switch": "", "state": "generated",
                          "roles": box.get(meta["name"], [])})
             cards.append(meta)
@@ -248,8 +255,67 @@ def _imports(source: str) -> list[str]:
     return sorted(found)
 
 
+def basic_tools() -> list[str]:
+    """Built tools that belong to the floor: every seat holds them, ungranted."""
+    out: list[str] = []
+    if not TOOLS_DIR.is_dir():
+        return out
+    for path in sorted(TOOLS_DIR.glob("*.py")):
+        if path.name.startswith("_"):
+            continue
+        meta = _metadata(path)
+        if meta and meta.get("kind") == BASIC:
+            out.append(meta["name"])
+    return out
+
+
+def basics() -> list[dict[str, Any]]:
+    """The Basic Tools panel: the floor waku ships, and what has joined it."""
+    cards: list[dict[str, Any]] = []
+    for item in BUILTIN_TOOLS:
+        if item["name"] not in BASE_TOOLS:
+            continue
+        cards.append({"name": item["name"], "description": item["description"],
+                      "schema": {}, "switch": "", "state": "floor",
+                      "icon": item["icon"], "origin": "builtin", "source": "",
+                      "kind": BASIC, "roles": [s.role for s in roster.SEATS]})
+    if TOOLS_DIR.is_dir():
+        for path in sorted(TOOLS_DIR.glob("*.py")):
+            if path.name.startswith("_"):
+                continue
+            meta = _metadata(path)
+            if meta is None or meta.get("kind") != BASIC:
+                continue
+            meta.update({"switch": "", "state": "floor", "roles": []})
+            cards.append(meta)
+    return cards
+
+
+def set_kind(name: str, kind: str) -> dict[str, Any]:
+    """Move a built tool between the floor and the market.
+
+    The only way back from basic: a tool that every seat holds is a change to
+    every seat, so demoting it has to be as deliberate as making it.
+    """
+    import re
+
+    if kind not in (BASIC, SPECIAL):
+        return {"error": f"kind must be {BASIC} or {SPECIAL}"}
+    path = TOOLS_DIR / f"{name}.py"
+    if not path.is_file():
+        return {"error": f"no built tool called {name}"}
+    source = path.read_text(encoding="utf-8")
+    line = f'KIND = "{kind}"'
+    if re.search(r"^KIND = .*$", source, re.MULTILINE):
+        source = re.sub(r"^KIND = .*$", line, source, count=1, flags=re.MULTILINE)
+    else:
+        source = line + "\n" + source
+    path.write_text(source, encoding="utf-8")
+    return {"name": name, "kind": kind}
+
+
 def assemble(name: str, description: str, schema: Any, icon: str,
-             body: str) -> dict[str, Any]:
+             body: str, kind: str = SPECIAL) -> dict[str, Any]:
     """Write a tool file from the parts the Lab typed.
 
     An assembler, not a generator: nothing here is inferred and nothing is
@@ -267,6 +333,8 @@ def assemble(name: str, description: str, schema: Any, icon: str,
                          "to call it, so it cannot be empty"}
     if not isinstance(schema, dict):
         return {"error": "the input shape has to be a JSON object"}
+    if kind not in (BASIC, SPECIAL):
+        return {"error": f"the kind has to be {BASIC} or {SPECIAL}"}
     body = (body or "").strip()
     if "def run(" not in body:
         return {"error": "the code body has to define run(**kwargs)"}
@@ -280,6 +348,7 @@ def assemble(name: str, description: str, schema: Any, icon: str,
               f"DESCRIPTION = {json.dumps(description.strip())}\n"
               f"ICON = {json.dumps(icon)}\n"
               f'ORIGIN = "lab"\n'
+              f"KIND = {json.dumps(kind)}\n"
               f"INPUT_SCHEMA = {json.dumps(schema, indent=4, sort_keys=True)}\n"
               f"\n\n{body}\n")
     TOOLS_DIR.mkdir(parents=True, exist_ok=True)

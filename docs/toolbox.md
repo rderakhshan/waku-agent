@@ -8,9 +8,9 @@ and never in a model's guess at run time.
 
 ## The page
 
-Five tabs: **Available** — what the agent can call this turn, drawn as the same
-cards the Market uses; **Results** — what it called; **Market** — what a seat may
-hold; **LAB** — build a tool; **MCP** — external servers.
+Five tabs: **LAB** — build a tool; **Basic Tools** — the floor, plus waku's own
+catalog; **Market** — what a seat may hold; **Results** — what it called;
+**MCP** — external servers.
 
 ## The default is nobody
 
@@ -18,10 +18,14 @@ A fresh department grants nothing. Every seat starts with the two tools it alway
 had — `save_note` and `manage_memory` — plus the delegation tools its ring allows.
 Everything else arrives because someone said so.
 
-Those two are shown as **every seat** rather than *nobody*, and carry no Assign
+Those two are shown in **Basic Tools** as *every seat*, and carry no Assign
 button: they are the floor, held before anything is granted. Reporting the grant
 file alone would have the Market say "nobody" about a tool the department page
 says is held by all twenty-four seats.
+
+The floor is not fixed. A tool built in the LAB as **basic** joins it, and then
+every seat holds it — including seats that never ran, and seats that run next
+week. That is why it is the one choice on the form that is worth reading twice.
 
 The file is `.waku-concentric/toolbox.json`, beside `metrics.db` and gitignored,
 because an assignment is a choice about your own department rather than source:
@@ -68,8 +72,15 @@ and it offers "Remove from everyone" once anyone holds the tool.
 - a **description** — the one field that decides whether the tool is ever called,
   because the model never reads your code;
 - an **icon** from the vendored set;
+- **who gets it** — *specialised*, which lands it in the Market to be assigned to
+  a seat, or *basic*, which puts it on the floor and hands it to all twenty-four
+  at once;
 - the **arguments**, added a row at a time: name, type, description, required;
 - the **code body**, pasted in.
+
+A tool can be moved between the two afterwards, from its card: **Make it basic**
+in the Market, **Move to the Market** in Basic Tools. The file records which it is
+as `KIND`, so the answer survives a restart and is visible to a reader.
 
 The page assembles the argument rows into the schema itself. A schema is something
 a page can build, and a typo in one is a tool that never gets called — so nobody
@@ -83,6 +94,7 @@ NAME = "lookup_rate"
 DESCRIPTION = "one sentence the model reads to decide when to call it"
 ICON = "chart"
 ORIGIN = "lab"
+KIND = "special"        # or "basic" for the floor
 INPUT_SCHEMA = {"type": "object", "properties": {...}, "required": [...]}
 
 def run(**kwargs) -> str: ...
@@ -104,9 +116,9 @@ under "What it actually does", so you can read it before you hand it out.
 
 ## How a grant reaches a seat
 
-`build_seat` keeps `BASE_TOOLS` plus `toolbox.tools_for(role)`, deletes the rest,
-then registers the built files that seat holds. One filter, reading a file instead
-of a constant.
+`build_seat` keeps `BASE_TOOLS`, the tools built as basic, and
+`toolbox.tools_for(role)`, deletes the rest, then registers the built files that
+seat holds. One filter, reading a file instead of a constant.
 
 Tests: `evals/deterministic/test_toolbox.py`. Two of them carry the weight: a tool
 file that raises on import still gets a card, and every way of getting the LAB's

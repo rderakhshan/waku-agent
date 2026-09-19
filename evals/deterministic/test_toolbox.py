@@ -144,11 +144,12 @@ def _lab(tmp_path, monkeypatch, **over):
     monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
     parts = {"name": "ok_tool", "description": "does a thing",
              "schema": {"type": "object", "properties": {}}, "icon": "tools",
-             "body": "def run(**kwargs) -> str:\n    return ''\n"}
+             "body": "def run(**kwargs) -> str:\n    return ''\n",
+             "kind": toolbox.SPECIAL}
     parts.update(over)
     return toolbox.assemble(parts.pop("name"), parts.pop("description"),
                             parts.pop("schema"), parts.pop("icon"),
-                            parts.pop("body"))
+                            parts.pop("body"), parts.pop("kind"))
 
 
 def test_the_lab_assembles_a_tool_from_its_parts(tmp_path, monkeypatch):
@@ -193,6 +194,50 @@ def test_a_shape_that_is_not_an_object_is_refused(tmp_path, monkeypatch):
 def test_an_id_already_in_use_is_refused(tmp_path, monkeypatch):
     _lab(tmp_path, monkeypatch)
     assert "already exists" in _lab(tmp_path, monkeypatch)["error"]
+
+
+# --- basic or specialised ----------------------------------------------------
+#
+# Basic is the higher-privilege direction: one form entry puts the tool into all
+# twenty-four seats with nobody assigning it. So the two destinations have to be
+# kept apart, and moving between them has to be a deliberate act.
+
+def test_a_basic_tool_joins_the_floor_and_stays_out_of_the_market(tmp_path, monkeypatch):
+    _lab(tmp_path, monkeypatch, name="always_on", kind=toolbox.BASIC)
+    assert "always_on" in {c["name"] for c in toolbox.basics()}
+    assert "always_on" not in {c["name"] for c in toolbox.market()}
+    assert toolbox.basic_tools() == ["always_on"]
+
+
+def test_a_specialised_tool_goes_to_the_market_and_not_the_floor(tmp_path, monkeypatch):
+    _lab(tmp_path, monkeypatch, name="sometimes", kind=toolbox.SPECIAL)
+    assert "sometimes" in {c["name"] for c in toolbox.market()}
+    assert "sometimes" not in {c["name"] for c in toolbox.basics()}
+    assert toolbox.basic_tools() == []
+
+
+def test_a_tool_can_be_moved_between_the_floor_and_the_market(tmp_path, monkeypatch):
+    monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
+    _lab(tmp_path, monkeypatch, name="mover", kind=toolbox.SPECIAL)
+    toolbox.set_kind("mover", toolbox.BASIC)
+    assert toolbox.basic_tools() == ["mover"]
+    toolbox.set_kind("mover", toolbox.SPECIAL)
+    assert toolbox.basic_tools() == []
+
+
+def test_a_kind_that_is_neither_is_refused(tmp_path, monkeypatch):
+    assert "kind" in _lab(tmp_path, monkeypatch, kind="whatever")["error"]
+
+
+def test_moving_a_tool_that_does_not_exist_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
+    assert "no built tool" in toolbox.set_kind("ghost", toolbox.BASIC)["error"]
+
+
+def test_the_floor_always_lists_what_waku_ships(tmp_path, monkeypatch):
+    """Even with nothing built, the panel has the two every seat holds."""
+    monkeypatch.setattr(toolbox, "TOOLS_DIR", tmp_path)
+    assert {"save_note", "manage_memory"} <= {c["name"] for c in toolbox.basics()}
 
 
 def test_the_assembled_file_is_the_contract_and_nothing_else(tmp_path, monkeypatch):
