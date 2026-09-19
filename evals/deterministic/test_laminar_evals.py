@@ -9,6 +9,7 @@ tested without a live department.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -97,6 +98,19 @@ def test_every_datapoint_carries_a_task_and_a_target():
     for item in le.DATASET:
         assert item["data"]["task"].strip()
         assert "expect_seat" in item["target"]
+
+
+def test_the_eval_loads_dot_env_before_reading_the_key(monkeypatch):
+    """An eval run imports no waku, so nothing else loads `.env` for it. Without
+    this the key in `.env` is invisible and the run refuses to start — which is
+    exactly what it did."""
+    monkeypatch.delenv("LMNR_PROJECT_API_KEY", raising=False)
+
+    def fake_load():
+        os.environ["LMNR_PROJECT_API_KEY"] = "from-dot-env"
+
+    monkeypatch.setattr("concentric.tracing.load_env", fake_load)
+    assert le.project_key() == "from-dot-env"
 
 
 def test_failure_datapoints_skip_runs_whose_ask_was_not_kept(monkeypatch):

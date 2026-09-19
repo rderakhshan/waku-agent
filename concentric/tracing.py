@@ -60,12 +60,14 @@ def _disabled() -> bool:
     return (os.environ.get(ENV_FLAG) or "").strip().lower() in _OFF
 
 
-def _load_env_file() -> None:
+def load_env() -> None:
     """Make the repo's .env visible here.
 
     waku loads it too, but not necessarily before the first trajectory, and the
-    tracing config must not depend on import order. `override=False` so a real
-    environment variable always beats the file.
+    tracing config must not depend on import order. Public because anything that
+    needs the connection values has the same problem — an eval run imports no
+    waku at all, so without this the key in .env is invisible to it.
+    `override=False` so a real environment variable always beats the file.
     """
     try:
         from dotenv import load_dotenv
@@ -91,7 +93,7 @@ def init() -> bool:
     if _failed_at and (time.monotonic() - _failed_at) < RETRY_SECONDS:
         return False
 
-    _load_env_file()
+    load_env()
     key = (os.environ.get("LMNR_PROJECT_API_KEY") or "").strip()
     if not key:
         _failed_at = time.monotonic()

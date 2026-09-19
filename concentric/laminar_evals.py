@@ -193,6 +193,19 @@ def failure_datapoints(limit: int | None = None) -> list[dict[str, Any]]:
     return out
 
 
+def project_key() -> str:
+    """The project key, with `.env` loaded first.
+
+    The dashboard gets `.env` through waku's config, but an eval run imports no
+    waku at all — so without this, the key sitting in `.env` is invisible and the
+    run refuses to start.
+    """
+    from concentric import tracing
+
+    tracing.load_env()
+    return (os.environ.get("LMNR_PROJECT_API_KEY") or "").strip()
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     limit: int | None = None
@@ -200,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         limit = int(args[args.index("--limit") + 1])
     from_failures = "--from-failures" in args
 
-    key = (os.environ.get("LMNR_PROJECT_API_KEY") or "").strip()
+    key = project_key()
     if not key:
         print("Set LMNR_PROJECT_API_KEY (see docs/laminar.md) before running evals.")
         return 2
