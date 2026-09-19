@@ -38,6 +38,7 @@ into four groups.
 | [commands.md](commands.md) | every `waku` and `make` command |
 | [evals.md](evals.md) | the two kinds of eval, the release gate, traces and spend |
 | [laminar.md](laminar.md) | per-trajectory tracing and evals for the department: the span mapping, the trajectory index, and what stays in `metrics.db` |
+| [toolbox.md](toolbox.md) | which seat may hold which tool: the assignment file, the market page, and why generated code has a review gate |
 | [roadmap.md](roadmap.md) | what is live, what is still a skeleton, upgrade paths |
 
 ## Whiteboards

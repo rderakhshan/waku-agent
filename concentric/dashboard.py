@@ -137,6 +137,7 @@ _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/icons.js"></script>\n'
            '<script src="/home.js"></script>\n'
            '<script src="/observation.js"></script>\n'
+           '<script src="/tools.js"></script>\n'
            '<script src="/laminar.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
@@ -467,6 +468,10 @@ def _handler_class():
                 body = (Path(__file__).parent / "static" / "icons.js").read_bytes()
                 self._frontend(body, "text/javascript")
                 return
+            if path == "/tools.js":
+                body = (Path(__file__).parent / "static" / "tools.js").read_bytes()
+                self._frontend(body, "text/javascript")
+                return
             if path == "/api/billboard":
                 # The bank is a directory, not a list: dropping a file into
                 # assets/images/ adds it to Home's rotation with no code change.
@@ -663,6 +668,17 @@ def _handler_class():
                 self._send(json.dumps({"trajectories": rows}).encode("utf-8"),
                            "application/json", no_cache=True)
                 return
+            if path == "/api/toolbox":
+                # The market, and who may hold each tool. Read fresh every time:
+                # the file is the truth, and it is small.
+                from concentric import roster, toolbox
+
+                self._send(json.dumps({
+                    "tools": toolbox.market(),
+                    "roles": [{"role": s.role, "title": s.title, "ring": s.ring,
+                               "parent": s.parent} for s in roster.SEATS],
+                }).encode("utf-8"), "application/json", no_cache=True)
+                return
             if path == "/api/data":
                 from concentric.collect import collect_department
 
@@ -686,6 +702,34 @@ def _handler_class():
             which is the arena's version of the same idea.
             """
             if self._proxy_laminar():
+                return
+            if self.path.split("?", 1)[0] in ("/api/toolbox", "/api/toolbox/generate"):
+                # Two writes: who holds a tool, and a new tool drafted from a
+                # description. The draft lands unassigned, always.
+                from concentric import toolbox
+
+                length = int(self.headers.get("Content-Length") or 0)
+                try:
+                    payload = json.loads(self.rfile.read(length) or b"{}")
+                except Exception:
+                    payload = {}
+                if self.path.split("?", 1)[0].endswith("/generate"):
+                    ask = str(payload.get("ask") or "").strip()
+                    body = ({"error": "describe the tool first"} if not ask
+                            else toolbox.generate(ask))
+                    if not body.get("error"):
+                        body = {**body, "tools": toolbox.market()}
+                else:
+                    tool = str(payload.get("tool") or "")
+                    roles = payload.get("roles") or []
+                    try:
+                        box = (toolbox.assign(tool, roles) if roles
+                               else toolbox.unassign(tool))
+                        body = {"box": box, "tools": toolbox.market()}
+                    except ValueError as exc:
+                        body = {"error": str(exc)}
+                self._send(json.dumps(body).encode("utf-8"),
+                           "application/json", no_cache=True)
                 return
             if self.path.split("?", 1)[0] != "/api/metrics/run":
                 try:

@@ -218,11 +218,24 @@ def build_seat(spec: roster.SeatSpec, *, config: dict[str, Any],
     _stamp_tracer(app, spec)
 
     # Scope is the registry: a tool the role does not own is never registered,
-    # so a seat cannot exceed its remit by asking nicely.
-    keep = set(BASE_TOOLS)
+    # so a seat cannot exceed its remit by asking nicely. What it owns is
+    # BASE_TOOLS plus whatever the toolbox grants this role — a file, so the
+    # grant is visible and reviewable rather than implied by a prompt.
+    from concentric import toolbox
+
+    granted = toolbox.tools_for(spec.role)
+    keep = set(BASE_TOOLS) | set(granted)
     for name in list(app.tools._tools):
         if name not in keep:
             del app.tools._tools[name]
+
+    # A generated tool was never in waku's registry, so the ones this seat holds
+    # are imported and added here. This is the only place generated code runs.
+    for name in granted:
+        if name not in app.tools._tools:
+            tool = toolbox.make_tool(name)
+            if tool is not None:
+                app.tools.register(tool)
 
     for tool in (make_delegate(spec, seat_for=seat_for),
                  make_peer(spec, seat_for=seat_for)):

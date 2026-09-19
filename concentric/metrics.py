@@ -883,6 +883,15 @@ def _ask(prompt: str, max_tokens: int = 700) -> str:
     return "".join(b.text for b in response.content if b.type == "text")
 
 
+def ask(prompt: str, max_tokens: int = 700) -> str:
+    """One model call through the agent's own client.
+
+    Public so a second caller need not reach into `_ask` — the toolbox writes a
+    tool with the same door the judge uses, and one door is the point.
+    """
+    return _ask(prompt, max_tokens)
+
+
 def _digest(turn: list[dict]) -> str:
     """One turn as a few readable lines. The judge sees what a reader would:
     who was asked, what they called, and what came back."""
