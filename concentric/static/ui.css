@@ -961,6 +961,13 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 .connactions .btn{flex:none}
 .tool-holders{display:flex;flex-wrap:wrap;gap:calc(var(--spacing) * 0.5);
   flex:1 1 auto;min-width:0;max-width:100%}
+/* The tool page is two levels: Tools over MCP, then the four sections inside
+   Tools. The second bar steps back — indented, a size down, against a left
+   rule — so the nesting reads at a glance instead of as two equal bars. */
+.tool-subtabs{margin:calc(var(--spacing) * 0.5) 0 0;
+  padding-left:calc(var(--spacing) * 1.5);
+  border-left:var(--rule-width) solid var(--rule)}
+.tool-subtabs .tab{font-size:var(--text-xs)}
 /* the lab's argument rows — one line per argument, assembled into a schema */
 .arg-row{display:grid;grid-template-columns:minmax(90px,1fr) 96px minmax(110px,1.4fr) auto auto;
   gap:calc(var(--spacing) * 0.5);align-items:center;margin-bottom:calc(var(--spacing) * 0.5)}

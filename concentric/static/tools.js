@@ -406,18 +406,30 @@
     return html;
   }
 
+  // Two levels, and the hash only carries one — so "Tools" is a grouping rather
+  // than a destination: anything that is not the MCP page is inside it. That is
+  // what lets the four tabs nest under one without a second hash segment.
+  const SUBTABS = [
+    { key: "lab", label: "LAB", href: "#tools/lab" },
+    { key: "", label: "Basic Tools", href: "#tools" },
+    { key: "market", label: "Market", href: "#tools/market" },
+    { key: "results", label: "Results", href: "#tools/results" },
+  ];
+
   VIEWS.tools = (d, sub) => {
-    const tabs = uiTabs([
-      { label: "LAB", href: "#tools/lab", on: sub === "lab" },
-      { label: "Basic Tools", href: "#tools", on: !sub },
-      { label: "Market", href: "#tools/market", on: sub === "market" },
-      { label: "Results", href: "#tools/results", on: sub === "results" },
-      { label: "MCP", href: "#tools/mcp", on: sub === "mcp" },
+    const on = sub || "";
+    const top = uiTabs([
+      { label: "Tools", href: "#tools/lab", on: on !== "mcp" },
+      { label: "MCP", href: "#tools/mcp", on: on === "mcp" },
     ]);
-    if (sub === "lab") return tabs + labTab();
-    if (sub === "market") return tabs + market();
-    if (sub === "results") return tabs + toolsResults(d);
-    if (sub === "mcp") return tabs + toolsMCP(d.tools || {});
-    return tabs + basicTools(d);
+    if (on === "mcp") return top + toolsMCP(d.tools || {});
+
+    const inner = uiTabs(SUBTABS.map((t) => ({
+      label: t.label, href: t.href, on: t.key === on })));
+    const body = on === "lab" ? labTab()
+      : on === "market" ? market()
+        : on === "results" ? toolsResults(d)
+          : basicTools(d);
+    return top + `<div class="tool-subtabs">${inner}</div>` + body;
   };
 })();
