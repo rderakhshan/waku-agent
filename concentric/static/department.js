@@ -71,7 +71,12 @@
   .dep.panning{cursor:grabbing}
   .dep-edge{stroke:var(--border,#9dc2e8);stroke-width:2.2;fill:none}
   .dep-edge.live{stroke:var(--warn,#b36b00);stroke-width:4}
-  .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:1.6;stroke-dasharray:5 5;opacity:.34}
+  /* The peer lattice. It was thin, pale and 34% opaque — three signals all
+     saying "ignore me", which is one too many. It now matches the delegation
+     edges in weight and lets the dash be the thing that distinguishes it, so
+     being secondary is a matter of pattern rather than of near-invisibility. */
+  .dep-peer{stroke:var(--border,#9dc2e8);stroke-width:2.2;stroke-dasharray:5 5;
+    opacity:.6}
   .dep-peer.live{stroke:var(--warn,#b36b00);stroke-width:3.4;stroke-dasharray:none;opacity:1}
   .dep-card{fill:var(--surface,#fff);stroke:var(--border,#2e6db4);stroke-width:1.6}
   /* Irina is the hub, not a warning: a neutral grey built from the theme's own
