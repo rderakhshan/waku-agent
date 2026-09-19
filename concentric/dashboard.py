@@ -138,6 +138,7 @@ _SCRIPT = ('<script src="/theme.js"></script>\n'
            '<script src="/home.js"></script>\n'
            '<script src="/observation.js"></script>\n'
            '<script src="/tools.js"></script>\n'
+           '<script src="/compare.js"></script>\n'
            '<script src="/laminar.js"></script>\n'
            '<script src="/department.js"></script>\n')
 # After main.js, because it re-wires the resizer main.js has just wired.
@@ -157,7 +158,7 @@ _BRAND = ('<style>\n'
           # still reachable by their own hash, and _fold() still finds the rows
           # it retags.
           'nav a[href="#gateway"],nav a[href="#loop"],nav a[href="#ops"],'
-          'nav a[href="#observation"]{display:none}\n'
+          'nav a[href="#observation"],nav a[href="#compare/memory"]{display:none}\n'
           '</style>\n'
           '<link rel="stylesheet" href="/ui.css">\n'
           '<link rel="stylesheet" href="/themes.css">\n')
@@ -227,7 +228,11 @@ def _rail_icons(html: str) -> str:
 
 # Rows this launcher renames. waku's shell is not ours to edit, so the label is
 # rewritten on the way through — the same string surgery the folds already do.
-_RAIL_NAMES = {"tools": "Tools &amp; MCPs"}
+# The memory race is folded into the model race's row, so it is renamed here and
+# hidden in the stylesheet below — the page itself is untouched and becomes the
+# second tab.
+_RAIL_NAMES = {"tools": "Tools &amp; MCPs",
+               "compare/models": "Model &amp; Memory LAB"}
 
 # Rows this launcher moves. Everything not named here keeps its place, so this
 # stays a rearrangement rather than a second opinion about the whole rail.
@@ -520,6 +525,10 @@ def _handler_class():
                 return
             if path == "/tools.js":
                 body = (Path(__file__).parent / "static" / "tools.js").read_bytes()
+                self._frontend(body, "text/javascript")
+                return
+            if path == "/compare.js":
+                body = (Path(__file__).parent / "static" / "compare.js").read_bytes()
                 self._frontend(body, "text/javascript")
                 return
             if path == "/api/billboard":
