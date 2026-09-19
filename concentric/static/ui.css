@@ -143,6 +143,10 @@ body {
   background: var(--rule);
 }
 
+/* The wordmark beside the mark. The mark alone is the identity; the name next
+   to it read as a second logo, so it is not shown. */
+.r-top .r-name { display: none; }
+
 /* rows */
 .rail > a {
   border-left: none;
@@ -150,17 +154,24 @@ body {
   margin: 1px var(--space-2);
   padding: 6px 10px 6px 8px;
   gap: var(--space-2);
+  /* waku spaces these apart, which was right when a row was a label and a
+     count. It is not right now that the tile was a third child: the label got
+     spread toward the middle. Labels start at the left; only the count is
+     pushed over. */
+  justify-content: flex-start;
   color: var(--text-muted);
   transition: background var(--motion-fast) var(--motion-ease),
               color var(--motion-fast) var(--motion-ease);
 }
-/* the monogram tile */
+/* the monogram tile.
+   It is the whole row when the rail is collapsed and nothing but noise when it
+   is open, so it only exists in the collapsed state. */
 .rail > a::before {
   content: attr(data-short);
   flex: none;
   width: 22px;
   height: 22px;
-  display: grid;
+  display: none;
   place-items: center;
   border-radius: 6px;
   border: var(--rule-width) solid var(--rule);
@@ -202,6 +213,7 @@ body {
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   padding-left: var(--space-2);
+  margin-left: auto;
 }
 .rail > a:focus-visible {
   outline: none;
@@ -224,7 +236,7 @@ body {
 body:has(.rail.collapsed) { --rail-w: 60px; }
 .rail.collapsed .r-top { padding: var(--space-3) var(--space-2); }
 .rail.collapsed > a { padding: 6px; }
-.rail.collapsed > a::before { width: 24px; height: 24px; }
+.rail.collapsed > a::before { display: grid; width: 24px; height: 24px; }
 .r-gh, #theme-toggle { border-radius: 8px; }
 .r-gh:hover, #theme-toggle:hover { background: color-mix(in srgb, var(--text-ink) 8%, transparent); }
 

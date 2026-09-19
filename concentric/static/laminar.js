@@ -77,36 +77,37 @@
   // need the `H S% L%` form rather than a colour.
   const TRIPLETS = {
     "--background": "--surface-bg",
-    "--foreground": "--text-ink",
     "--card": "--surface-paper",
-    "--card-foreground": "--text-ink",
     "--popover": "--surface-paper",
-    "--popover-foreground": "--text-ink",
     "--secondary": "--surface-raised",
-    "--secondary-foreground": "--text-ink",
     "--muted": "--surface-raised",
-    "--muted-foreground": "--text-muted",
     "--accent": "--surface-raised",
-    "--accent-foreground": "--text-ink",
-    "--primary-foreground": "--accent-ink",
-    "--chart-1": "--chart-1",
-    "--chart-2": "--chart-2",
     "--destructive": "--bad",
     "--border": "--rule",
     "--input": "--rule",
     "--ring": "--accent",
+    "--chart-1": "--chart-1",
+    "--chart-2": "--chart-2",
     // The sidebar keeps a palette of its own — shadcn's sidebar reads
     // `hsl(var(--sidebar-*))`, not the surface scale, so it stayed dark while
     // everything around it followed.
     "--sidebar-background": "--surface-paper",
-    "--sidebar-foreground": "--text-ink",
     "--sidebar-primary": "--accent",
-    "--sidebar-primary-foreground": "--accent-ink",
     "--sidebar-accent": "--surface-raised",
-    "--sidebar-accent-foreground": "--text-ink",
     "--sidebar-border": "--rule",
     "--sidebar-ring": "--accent",
   };
+
+  // Every text token, flat black. Laminar gets its hierarchy from a foreground
+  // scale plus opacity classes (`text-foreground/70`), which is what read as
+  // grey on Irina's light ground; one colour is the request, so one colour is
+  // what this sets.
+  const TEXT_TOKENS = [
+    "--foreground", "--card-foreground", "--popover-foreground",
+    "--secondary-foreground", "--accent-foreground", "--muted-foreground",
+    "--primary-foreground", "--sidebar-foreground",
+    "--sidebar-accent-foreground", "--sidebar-primary-foreground",
+  ];
 
   // --- building the theme -----------------------------------------------------
 
@@ -163,6 +164,10 @@
       const rgb = toRgb(getComputedStyle(probe).color);
       if (rgb) lines.push(`${mine}:${hslTriplet(rgb)}`);
     }
+    for (const name of TEXT_TOKENS) lines.push(`${name}:0 0% 0%`);
+    for (const step of Object.keys(FOREGROUND)) {
+      lines.push(`--color-foreground-${step}:#000`);
+    }
     const radius = raw("--radius");
     if (radius) lines.push(`--radius:${radius}`);
 
@@ -173,6 +178,12 @@
     // directly is ours, and it is what actually makes the page follow.
     const bgRgb = resolved("--surface-bg");
     if (bgRgb) css += `html,body{background-color:${bgRgb} !important}`;
+    // The trace panels are CodeMirror, and CodeMirror themes itself in
+    // JavaScript — hardcoded `#c9d1d9` for text and the literal string "gray"
+    // for the gutter. No token reaches it, so the text is forced from here.
+    css += `.cm-editor,.cm-editor .cm-content,.cm-editor .cm-line,`
+      + `.cm-editor .cm-gutters,.cm-editor .cm-gutterElement,`
+      + `.cm-editor span{color:#000 !important}`;
     return css;
   }
 

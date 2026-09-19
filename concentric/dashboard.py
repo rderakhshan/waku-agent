@@ -147,6 +147,12 @@ _AFTER = '<script src="/layout.js"></script>\n'
 _BRAND = ('<style>\n'
           '.r-top .mark{-webkit-mask:url(/irina-mark.svg) center/contain no-repeat;'
           'mask:url(/irina-mark.svg) center/contain no-repeat}\n'
+          # Rows this launcher does not want in the rail. Hidden in CSS rather
+          # than deleted from the shell: the pages themselves are untouched and
+          # still reachable by their own hash, and _fold() still finds the rows
+          # it retags.
+          'nav a[href="#gateway"],nav a[href="#loop"],nav a[href="#ops"],'
+          'nav a[href="#observation"]{display:none}\n'
           '</style>\n'
           '<link rel="stylesheet" href="/ui.css">\n'
           '<link rel="stylesheet" href="/themes.css">\n')

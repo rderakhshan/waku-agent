@@ -872,19 +872,14 @@
   VIEWS.department = (d) => {
     const dep = d.department;
     latest = d;
-    const head = `<div class="meta" style="margin-bottom:var(--space-3)">Twenty-four seats on
-      waku, laid out by force rather than by hand: nodes push each other apart, edges pull their
-      ends together, and the teams cluster because their edges are denser. Every seat is a full
-      waku agent, so every block holds the same inner flow -
-      <b>gate - llm - tool - out</b> - and the part that is working <b>beats</b>.</div>`;
-    if (!dep) return head + uiCard(`<span class="empty">no department payload</span>`);
+    if (!dep) return uiCard(`<span class="empty">no department payload</span>`);
     const built = dep.seats.filter((s) => s.built).length;
     const L = layout(dep);
     // After the DOM swaps in: re-apply the beats, and re-attach the view so a
     // refresh keeps the reader's zoom and pan.
     setTimeout(() => { paint(); attachZoom(document.querySelector("svg.dep"), L.nodes);
                        wireZoomBar(L.nodes); }, 0);
-    return head + departmentSVG(dep) + legend()
+    return departmentSVG(dep) + legend()
       + uiCard(`<div class="meta">${built} of ${dep.seats.length} seats have run &middot;
         ${dep.edges.length} delegation edges. Grey = never used.</div>`)
       + seatsTable(dep);
@@ -906,19 +901,11 @@
   // and leaving it here is what makes that explicit rather than a thing someone
   // has to reconstruct later.
   //
-  // main.js calls VIEWS.overview(D) without the sub-path — the overview branch of
-  // its router predates sub-tabs — so the mode is read from location.hash, which
-  // is where the router keeps it anyway.
+  // The view takes the sub-path main.js passes and ignores it: the router's
+  // overview branch predates sub-tabs, so #overview and #overview/multi both land
+  // here, and with the tab bar gone there is nothing left to switch between.
   const overviewBase = VIEWS.overview;   // deliberately not rendered; see above
   const departmentBase = VIEWS.department;
-
-  // One tab, always on: it names the mode the page is in, which is the only thing
-  // a tab bar can still say now that there is nothing to switch to. Both
-  // #overview and #overview/multi land here, so links made before this change
-  // still work.
-  function viewTabs() {
-    return uiTabs([{ label: "Multi Agentic", href: "#overview/multi", on: true }]);
-  }
 
   VIEWS.overview = (d, sub) => {
     // The head is written by the router before the view runs, so the page's own
@@ -927,6 +914,6 @@
       const title = document.getElementById("title");
       if (title) title.textContent = "Work Desk";
     }, 0);
-    return viewTabs() + departmentBase(d, sub);
+    return departmentBase(d, sub);
   };
 })();
