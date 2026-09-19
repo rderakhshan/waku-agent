@@ -8,6 +8,7 @@ concentric graph can be rebuilt from the event stream alone.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,11 +54,27 @@ class Seat:
         return observe
 
     def respond(self, task: str, observer: Observer | None = None,
-                source: str = "cli", stream: bool = False, **kwargs) -> LoopResult:
+                source: str = "cli", stream: bool = False,
+                session_id: str | None = None, **kwargs) -> LoopResult:
         # A Seat stands in wherever a Waku does, so it must accept every argument
         # Waku.respond does — the dashboard passes source="dashboard" and
         # stream=True, and a narrower signature broke the dock with a TypeError.
         # Anything unrecognised is forwarded, and Waku.respond rejects it there.
+        #
+        # `session_id` is the one argument waku does not know: it is consumed
+        # here to group a trace, and never forwarded.
+        from concentric import tracing
+
+        # A ring-0 seat is never reached from below — workers cannot name irina —
+        # so it is where a trajectory begins. `in_trajectory()` stops the CLI
+        # path (Department.run opens one, then calls down) from opening a second,
+        # and it is what makes the dashboard's direct call to Irina trace too.
+        if self.spec.ring == 0 and not tracing.in_trajectory():
+            return self._run_trajectory(task, observer, source, stream,
+                                        session_id, kwargs)
+        return self._turn(task, observer, source, stream, kwargs)
+
+    def _turn(self, task, observer, source, stream, kwargs) -> LoopResult:
         from concentric import tracing
 
         with tracing.seat(self.spec.role, ring=self.spec.ring,
@@ -66,6 +83,46 @@ class Seat:
                                       source=source, stream=stream, **kwargs)
             tracing.set_output(result.reply)
             return result
+
+    def _run_trajectory(self, task, observer, source, stream, session_id,
+                        kwargs) -> LoopResult:
+        """One trajectory: the trace, and the local index row that points at it.
+
+        The counts cannot be read off the reply, so they come from the event
+        stream — the same one the CLI prints, which is the only place the edges
+        are visible.
+        """
+        from concentric import history, tracing
+
+        tracing.init()
+        started = time.monotonic()
+        seats: list[str] = []
+        handoffs = 0
+
+        def watch(kind: str, event: dict) -> None:
+            nonlocal handoffs
+            role = event.get("role")
+            if role and role not in seats:
+                seats.append(role)
+            if kind == "tool" and event.get("tool") in ("delegate", "consult_peer"):
+                handoffs += 1
+            if observer is not None:
+                observer(kind, event)
+
+        with tracing.trajectory(task, entry=self.spec.role, session_id=session_id):
+            try:
+                return self._turn(task, watch, source, stream, kwargs)
+            finally:
+                tracing.flush()
+                trace = tracing.trace_id()
+                if trace:
+                    try:
+                        history.record_trajectory(
+                            trace, session_id=session_id, entry=self.spec.role,
+                            seats=seats, handoffs=handoffs,
+                            duration_ms=int((time.monotonic() - started) * 1000))
+                    except Exception:
+                        pass  # the store must never take the run down
 
     def tool_names(self) -> set[str]:
         return set(self.app.tools._tools)

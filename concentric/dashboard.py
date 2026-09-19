@@ -438,6 +438,25 @@ def _handler_class():
                 self._send(json.dumps(result).encode("utf-8"),
                            "application/json", no_cache=True)
                 return
+            if path == "/api/metrics/trajectories":
+                # The runs behind the numbers. The index is local; the run itself
+                # is in Laminar, and the trace_id is how you get there.
+                from urllib.parse import parse_qs
+
+                from concentric import history
+
+                query = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                try:
+                    rows = history.trajectories(
+                        limit=int((query.get("limit") or ["20"])[0]),
+                        since=(query.get("since") or [None])[0])
+                except Exception as exc:
+                    self._send(json.dumps({"error": str(exc)}).encode(),
+                               "application/json", no_cache=True)
+                    return
+                self._send(json.dumps({"trajectories": rows}).encode("utf-8"),
+                           "application/json", no_cache=True)
+                return
             if path == "/api/data":
                 from concentric.collect import collect_department
 

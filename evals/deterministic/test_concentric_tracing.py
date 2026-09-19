@@ -60,6 +60,23 @@ def test_a_no_op_span_does_not_swallow_the_caller_error():
         raise ValueError("boom")
 
 
+def test_in_trajectory_is_false_outside_and_true_inside():
+    """The guard the seat uses to decide whether it is the boundary. It has to
+    be true even with tracing off, or the CLI would open two trajectories."""
+    assert tracing.in_trajectory() is False
+    with tracing.trajectory("t"):
+        assert tracing.in_trajectory() is True
+    assert tracing.in_trajectory() is False
+
+
+def test_nested_trajectories_unwind_cleanly():
+    with tracing.trajectory("outer"):
+        with tracing.trajectory("inner"):
+            assert tracing.in_trajectory() is True
+        assert tracing.in_trajectory() is True
+    assert tracing.in_trajectory() is False
+
+
 def test_the_sdk_is_never_imported_when_off():
     """The strongest form of "optional": a clean process must not pull lmnr in."""
     code = (

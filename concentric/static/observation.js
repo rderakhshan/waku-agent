@@ -345,6 +345,48 @@
       ${waiting} waiting on a run · ${ready} ready to build · ${planned} planned</p>`;
   }
 
+  // --- the runs behind the numbers --------------------------------------------
+  //
+  // A snapshot says what the department did; this says which run did it. The
+  // index is local and thin — the run itself is in Laminar, so the trace id is
+  // the link, and it is shown rather than hidden because it is the only thing
+  // you can paste into the other tool.
+
+  let runs = null;
+  let runsAt = 0;
+
+  async function loadRuns() {
+    if (runs !== null && Date.now() - runsAt < 60000) return;
+    try {
+      const res = await fetch("/api/metrics/trajectories?limit=15");
+      const data = await res.json();
+      runs = data.trajectories || [];
+    } catch (e) {
+      runs = [];
+    }
+    runsAt = Date.now();
+    if (typeof render === "function") render();
+  }
+
+  function recentRuns() {
+    if (runs === null) {
+      return uiCard(`<p class="meta">reading the trajectory index…</p>`,
+        { title: "Recent runs" });
+    }
+    if (!runs.length) {
+      return uiCard(`<p class="lab-quiet">No runs recorded yet. Tracing has to
+        be on (IRINA_LAMINAR=1) for a run to land here.</p>`,
+        { title: "Recent runs" });
+    }
+    const body = runs.map((r) => `<div class="lab-flow">
+        <code class="lab-flow-from">${esc(String(r.ts || "").slice(0, 19).replace("T", " "))}</code>
+        <span class="lab-flow-line"><i>${esc(r.handoffs || 0)}</i></span>
+        <code class="lab-flow-to">${esc(r.entry || "?")}</code>
+        <span class="lab-flow-note meta">${esc(r.trace_id || "")}</span>
+      </div>`).join("");
+    return `<h2>Recent runs</h2>${body}`;
+  }
+
   // --- the department tree ----------------------------------------------------
   //
   // The roster carries a parent for every seat, so the table can be the org
@@ -630,10 +672,11 @@
     // need. Only the columns on screen are fetched — a hidden column costs
     // nothing until it is shown.
     const visible = (allColumns ? COLS.concat(MORE_COLS) : COLS).map((c) => c.id);
-    setTimeout(() => { wireBatch(); wireDept(); wireTrends(visible); }, 0);
+    setTimeout(() => { wireBatch(); wireDept(); wireTrends(visible); loadRuns(); }, 0);
     return verdict(m, d)
       + batchBar(d)
       + summaryLine(rows)
+      + recentRuns()
       + departmentTable(d, m)
       + handoffFlows(m)
       + gaps(rows);

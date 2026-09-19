@@ -71,6 +71,16 @@ CREATE TABLE IF NOT EXISTS readings (
 );
 CREATE INDEX IF NOT EXISTS ix_series ON readings(metric, subject, snapshot);
 CREATE TABLE IF NOT EXISTS marks (key TEXT PRIMARY KEY, value TEXT);
+CREATE TABLE IF NOT EXISTS trajectories (
+  trace_id    TEXT PRIMARY KEY,
+  ts          TEXT NOT NULL,
+  session_id  TEXT,
+  entry       TEXT,
+  seats       TEXT,
+  handoffs    INTEGER,
+  duration_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS ix_trajectories_ts ON trajectories(ts);
 """
 
 
@@ -124,6 +134,58 @@ def set_mark(conn: sqlite3.Connection, key: str, value: str) -> None:
     conn.execute("INSERT INTO marks(key, value) VALUES(?, ?) "
                  "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
     conn.commit()
+
+
+# --- trajectories ------------------------------------------------------------
+#
+# A snapshot is the department in aggregate; a trajectory is one run. The two do
+# not reduce to each other, so this store keeps both: the readings answer "which
+# seat is worst", and this table answers "which run was that". It is deliberately
+# thin — the run itself lives in Laminar, and the trace_id is the way there.
+
+def record_trajectory(trace_id: str, *, ts: str | None = None,
+                      session_id: str | None = None, entry: str | None = None,
+                      seats: list[str] | None = None, handoffs: int = 0,
+                      duration_ms: int | None = None,
+                      conn: sqlite3.Connection | None = None) -> None:
+    """Index one traced run. Called after a trajectory finishes, not before —
+    a row for a run that never completed would be a claim about nothing."""
+    own = conn is None
+    conn = conn or connect()
+    try:
+        conn.execute(
+            "INSERT INTO trajectories"
+            "(trace_id, ts, session_id, entry, seats, handoffs, duration_ms) "
+            "VALUES(?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(trace_id) DO UPDATE SET "
+            "ts = excluded.ts, session_id = excluded.session_id, "
+            "entry = excluded.entry, seats = excluded.seats, "
+            "handoffs = excluded.handoffs, duration_ms = excluded.duration_ms",
+            (trace_id, ts or datetime.now(UTC).isoformat(), session_id, entry,
+             ",".join(seats or []), handoffs, duration_ms))
+        conn.commit()
+    finally:
+        if own:
+            conn.close()
+
+
+def trajectories(limit: int = 50, since: str | None = None,
+                 conn: sqlite3.Connection | None = None) -> list[dict]:
+    """The most recent runs, newest first — the index behind a trend point."""
+    own = conn is None
+    conn = conn or connect()
+    try:
+        sql = "SELECT * FROM trajectories"
+        params: list = []
+        if since:
+            sql += " WHERE ts >= ?"
+            params.append(since)
+        sql += " ORDER BY ts DESC LIMIT ?"
+        params.append(limit)
+        return [dict(row) for row in conn.execute(sql, params).fetchall()]
+    finally:
+        if own:
+            conn.close()
 
 
 # --- writing -----------------------------------------------------------------
@@ -396,6 +458,8 @@ def main() -> None:
     parser.add_argument("--prune", action="store_true")
     parser.add_argument("--regressions", action="store_true",
                         help="the series that moved the wrong way, worst first")
+    parser.add_argument("--trajectories", action="store_true",
+                        help="the most recent traced runs, newest first")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -422,6 +486,19 @@ def main() -> None:
                      if r["relative"] is not None else "off zero")
             print(f"  {r['metric']:<24} {r['subject'] or '(all)':<18} "
                   f"{r['was']} -> {r['now']}  {moved}  ({r['bucket']})")
+        return
+    if args.trajectories:
+        rows = trajectories(conn=conn)
+        if args.json:
+            print(json.dumps(rows, indent=2))
+            return
+        if not rows:
+            print("no trajectories recorded (tracing must be on for a run to land here)")
+            return
+        print(f"trajectories - {len(rows)} most recent")
+        for r in rows:
+            print(f"  {r['ts']}  {r['entry'] or '?':<8} "
+                  f"{r['handoffs'] or 0} handoffs  {r['trace_id']}")
         return
     if not args.metric:
         rows = conn.execute(

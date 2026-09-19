@@ -19,6 +19,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 
 ENV_FLAG = "IRINA_LAMINAR"
@@ -26,6 +27,16 @@ _TRUTHY = {"1", "on", "true", "yes"}
 
 # Set once by init(); read by every helper. None means tracing is off.
 _Laminar: Any = None
+
+# How deep the current trajectory is nested. A contextvar, not a global: the
+# dashboard is a threaded server, and a shared counter would let one request's
+# trajectory make another request think it was already inside one.
+_DEPTH: ContextVar[int] = ContextVar("irina_tracing_depth", default=0)
+
+
+def in_trajectory() -> bool:
+    """True when a trajectory is already open on this thread."""
+    return _DEPTH.get() > 0
 
 
 def enabled() -> bool:
@@ -105,10 +116,14 @@ def trajectory(task: str, entry: str = "irina",
                session_id: str | None = None,
                user_id: str | None = None) -> Iterator[Any]:
     """The whole run: one trace. `session_id` groups several runs together."""
-    with span(f"trajectory.{entry}",
-              {"irina.entry": entry, "irina.task": task[:500]},
-              session_id=session_id, user_id=user_id) as current:
-        yield current
+    token = _DEPTH.set(_DEPTH.get() + 1)
+    try:
+        with span(f"trajectory.{entry}",
+                  {"irina.entry": entry, "irina.task": task[:500]},
+                  session_id=session_id, user_id=user_id) as current:
+            yield current
+    finally:
+        _DEPTH.reset(token)
 
 
 @contextmanager
@@ -136,6 +151,22 @@ def handoff(tool: str, frm: str, to: str, task: str) -> Iterator[Any]:
                "irina.task": task[:500]},
               span_type="TOOL") as current:
         yield current
+
+
+def trace_id() -> str | None:
+    """The current trace's id, or None when tracing is off.
+
+    Read inside the trajectory's `with` block — that is the window where the
+    current trace exists, and it is what lets the run be indexed in the local
+    store without the store knowing anything about Laminar.
+    """
+    if _Laminar is None:
+        return None
+    try:
+        current = _Laminar.get_trace_id()
+    except Exception:
+        return None
+    return str(current) if current else None
 
 
 def set_output(text: str) -> None:

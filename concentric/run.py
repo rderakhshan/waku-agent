@@ -71,20 +71,17 @@ class Department:
     def run(self, task: str, entry: str = "irina",
             observer: Observer | None = None, stream: bool = False,
             session_id: str | None = None) -> str:
-        """One trajectory — the unit a Laminar trace is made of."""
-        from concentric import tracing
+        """One trajectory. The seat it enters through opens the trace.
 
+        The trace and its index row live in `Seat.respond`, not here, because
+        the dashboard reaches Irina without going through this method — one
+        boundary in the seat covers both callers.
+        """
         session = session_id or self.session_id or self._resolved_session
         if session is None:
             session = self._resolved_session = f"irina-{datetime.now():%Y%m%d-%H%M%S}"
-
-        tracing.init()
-        with tracing.trajectory(task, entry=entry, session_id=session):
-            try:
-                return self.seat_for(entry).respond(
-                    task, observer=observer, stream=stream).reply
-            finally:
-                tracing.flush()
+        return self.seat_for(entry).respond(
+            task, observer=observer, stream=stream, session_id=session).reply
 
 
 def build_department(*, config: dict[str, Any] | None = None,
