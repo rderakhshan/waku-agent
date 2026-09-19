@@ -101,30 +101,43 @@ class Seat:
         started = time.monotonic()
         seats: list[str] = []
         handoffs = 0
+        events: list[dict] = []
 
         def watch(kind: str, event: dict) -> None:
             nonlocal handoffs
             role = event.get("role")
             if role and role not in seats:
                 seats.append(role)
-            if kind == "tool" and event.get("tool") in ("delegate", "consult_peer"):
-                handoffs += 1
+            if kind == "tool":
+                # The whole event, not just the edge: `output` is what tells a
+                # hand-off that came back empty from one that answered, and the
+                # graph rules need it.
+                events.append({"tool": event.get("tool"),
+                               "args": event.get("args") or {},
+                               "output": event.get("output"), "role": role})
+                if event.get("tool") in ("delegate", "consult_peer"):
+                    handoffs += 1
             if observer is not None:
                 observer(kind, event)
 
+        reply = None
         with tracing.trajectory(task, entry=self.spec.role, session_id=session):
             try:
-                return self._turn(task, watch, source, stream, kwargs)
+                result = self._turn(task, watch, source, stream, kwargs)
+                reply = result.reply
+                return result
             finally:
                 tracing.flush()
                 try:
                     # The trace id is None when Laminar was unreachable; the row
                     # is written either way, so an outage costs the detail and
-                    # never the fact.
+                    # never the fact. The ask and the answer are kept with it so
+                    # a run that went wrong can be run again later.
                     history.record_trajectory(
                         tracing.trace_id(), session_id=session,
                         entry=self.spec.role, seats=seats, handoffs=handoffs,
-                        duration_ms=int((time.monotonic() - started) * 1000))
+                        duration_ms=int((time.monotonic() - started) * 1000),
+                        task=task, reply=reply, violations=_violations(events))
                 except Exception:
                     pass  # the store must never take the run down
 
@@ -168,6 +181,18 @@ def _session_of(app: Waku) -> str | None:
     """
     session = getattr(app, "session", None)
     return getattr(session, "session_id", None) or None
+
+
+def _violations(events: list[dict]) -> list[str]:
+    """The department's own rules this run broke, by name.
+
+    Checked here rather than at eval time so a bad run is flagged as it happens:
+    the index is local, so this works with Laminar down, and the eval later has
+    a list of cases instead of a corpus to search.
+    """
+    from concentric import graph_rules
+
+    return [name for name, hits in graph_rules.violations(events).items() if hits]
 
 
 def build_seat(spec: roster.SeatSpec, *, config: dict[str, Any],

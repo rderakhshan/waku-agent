@@ -79,7 +79,10 @@ CREATE TABLE IF NOT EXISTS trajectories (
   entry       TEXT,
   seats       TEXT,
   handoffs    INTEGER,
-  duration_ms INTEGER
+  duration_ms INTEGER,
+  task        TEXT,
+  reply       TEXT,
+  violations  TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_trajectories_ts ON trajectories(ts);
 """
@@ -98,7 +101,10 @@ CREATE TABLE trajectories (
   entry       TEXT,
   seats       TEXT,
   handoffs    INTEGER,
-  duration_ms INTEGER
+  duration_ms INTEGER,
+  task        TEXT,
+  reply       TEXT,
+  violations  TEXT
 );
 CREATE INDEX ix_trajectories_ts ON trajectories(ts);
 INSERT INTO trajectories (trace_id, ts, session_id, entry, seats, handoffs, duration_ms)
@@ -106,6 +112,11 @@ INSERT INTO trajectories (trace_id, ts, session_id, entry, seats, handoffs, dura
   FROM trajectories_old;
 DROP TABLE trajectories_old;
 """
+
+# Columns added after a table already existed. ALTER rather than rebuild: a
+# rebuild is only worth it when the shape of a key changes, and these are plain
+# additions a running store can take in place.
+_ADDED_TRAJECTORY_COLUMNS = {"task": "TEXT", "reply": "TEXT", "violations": "TEXT"}
 
 
 def _home_env() -> None:
@@ -144,6 +155,11 @@ def connect(path: Path | None = None) -> sqlite3.Connection:
     columns = {row["name"] for row in conn.execute("PRAGMA table_info(trajectories)")}
     if "id" not in columns:  # written before a trace_id could be absent
         conn.executescript(_MIGRATE_TRAJECTORIES)
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(trajectories)")}
+    for name, decl in _ADDED_TRAJECTORY_COLUMNS.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE trajectories ADD COLUMN {name} {decl}")
+    conn.commit()
     return conn
 
 
@@ -173,7 +189,8 @@ def set_mark(conn: sqlite3.Connection, key: str, value: str) -> None:
 def record_trajectory(trace_id: str | None, *, ts: str | None = None,
                       session_id: str | None = None, entry: str | None = None,
                       seats: list[str] | None = None, handoffs: int = 0,
-                      duration_ms: int | None = None,
+                      duration_ms: int | None = None, task: str | None = None,
+                      reply: str | None = None, violations: list[str] | None = None,
                       conn: sqlite3.Connection | None = None) -> None:
     """Index one run. Called after a trajectory finishes, not before — a row for
     a run that never completed would be a claim about nothing.
@@ -185,16 +202,19 @@ def record_trajectory(trace_id: str | None, *, ts: str | None = None,
     own = conn is None
     conn = conn or connect()
     try:
-        columns = ("(trace_id, ts, session_id, entry, seats, handoffs, duration_ms)")
+        columns = ("(trace_id, ts, session_id, entry, seats, handoffs,"
+                   " duration_ms, task, reply, violations)")
         values = (trace_id, ts or datetime.now(UTC).isoformat(), session_id,
-                  entry, ",".join(seats or []), handoffs, duration_ms)
-        sql = f"INSERT INTO trajectories {columns} VALUES(?, ?, ?, ?, ?, ?, ?)"
+                  entry, ",".join(seats or []), handoffs, duration_ms,
+                  task, reply, ",".join(violations or []))
+        sql = f"INSERT INTO trajectories {columns} VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         if trace_id is not None:
             # A trace seen twice is the same run, not two.
             sql += (" ON CONFLICT(trace_id) DO UPDATE SET ts = excluded.ts,"
                     " session_id = excluded.session_id, entry = excluded.entry,"
                     " seats = excluded.seats, handoffs = excluded.handoffs,"
-                    " duration_ms = excluded.duration_ms")
+                    " duration_ms = excluded.duration_ms, task = excluded.task,"
+                    " reply = excluded.reply, violations = excluded.violations")
         conn.execute(sql, values)
         conn.commit()
     finally:
@@ -216,6 +236,24 @@ def trajectories(limit: int = 50, since: str | None = None,
         sql += " ORDER BY ts DESC, id DESC LIMIT ?"
         params.append(limit)
         return [dict(row) for row in conn.execute(sql, params).fetchall()]
+    finally:
+        if own:
+            conn.close()
+
+
+def failures(limit: int = 50, conn: sqlite3.Connection | None = None) -> list[dict]:
+    """Runs that broke one of the department's own rules, newest first.
+
+    These are the cases worth re-running: a fix is only proven by the run that
+    used to fail.
+    """
+    own = conn is None
+    conn = conn or connect()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM trajectories WHERE COALESCE(violations, '') != '' "
+            "ORDER BY ts DESC, id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(row) for row in rows]
     finally:
         if own:
             conn.close()
