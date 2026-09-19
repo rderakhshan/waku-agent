@@ -158,7 +158,8 @@ _BRAND = ('<style>\n'
           # still reachable by their own hash, and _fold() still finds the rows
           # it retags.
           'nav a[href="#gateway"],nav a[href="#loop"],nav a[href="#ops"],'
-          'nav a[href="#observation"],nav a[href="#compare/memory"]{display:none}\n'
+          'nav a[href="#observation"],nav a[href="#graph"],nav a[href="#database"],'
+          'nav a[href="#compare/memory"]{display:none}\n'
           '</style>\n'
           '<link rel="stylesheet" href="/ui.css">\n'
           '<link rel="stylesheet" href="/themes.css">\n')
