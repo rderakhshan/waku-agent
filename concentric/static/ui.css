@@ -645,12 +645,14 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 /* Home's lower half: the frame, and the advert beside it. home.js measures this
    row to the space left under the hero, which is what keeps the page from
    scrolling; the billboard fills its cell and the advert scrolls its own. */
-.home-cols{display:grid;gap:var(--space-5);margin-top:var(--space-6);
+.home-cols{display:grid;gap:var(--space-6);margin-top:var(--space-6);
   grid-template-columns:minmax(0,1.6fr) minmax(260px,1fr);align-items:stretch}
 /* Grid items default to min-width/min-height:auto, which refuses to shrink below
    their content — the advert then grew out of its cell and over the frame. */
 .home-cols > *{min-width:0;min-height:0}
-@media (max-width:900px){ .home-cols{grid-template-columns:1fr;height:auto !important} }
+@media (max-width:900px){
+  .home-cols{grid-template-columns:1fr;height:auto !important}
+}
 .billboard{border:var(--rule-width) solid var(--rule);border-radius:var(--radius,10px);
   overflow:hidden;background:var(--surface-paper);height:100%;min-height:160px}
 .billboard-empty{display:grid;place-items:center;height:100%;margin:0;padding:var(--space-4);
@@ -662,7 +664,13 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
 
 /* the advert: type only. No frame, no fill, no bullets — the size change is the
    whole device, so a claim reads first and its sentence second. */
-.home-ad{overflow:auto;padding:2px 2px 2px var(--space-2)}
+/* No frame and no rule: the grid gap is the whole separation. */
+.home-ad{overflow:auto;padding:2px}
+/* Half the column and centred, height from the file's own ratio so it stays
+   proportional at any width. */
+.ad-figure{margin:0 0 var(--space-5)}
+.ad-figure img{display:block;width:50%;height:auto;margin:0 auto;
+  border:var(--rule-width) solid var(--rule);border-radius:var(--radius,8px)}
 .ad-kicker{font-family:var(--face-mono);font-size:var(--text-xs);letter-spacing:.12em;
   text-transform:uppercase;color:var(--text-faint);margin:0 0 var(--space-4)}
 .ad-abstract-label{font-family:var(--face-mono);font-size:var(--text-xs);letter-spacing:.12em;

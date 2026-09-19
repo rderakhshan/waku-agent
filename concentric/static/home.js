@@ -91,6 +91,11 @@
         them &mdash; who may task whom, and how deep &mdash; are enforced in code rather than
         asked for in a prompt, and every run is traced, scored and kept on the machine that
         ran it.</p>
+      <figure class="ad-figure">
+        <img src="/assets/images/workdesk.png"
+          alt="The department graph: Irina at the centre, four CFOs around her, workers below."
+          onerror="this.closest('figure').hidden = true">
+      </figure>
       ${beat(`<span class="ad-huge">24</span> seats, one department.`,
              "One chief model risk officer, four CFOs and nineteen workers &mdash; every one a "
              + "full agent with its own memory, its own prompt and its own tools.")}

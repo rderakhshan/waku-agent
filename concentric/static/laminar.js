@@ -127,6 +127,16 @@
     return rgb ? `rgb(${rgb[0]}, ${rgb[1]}, ${rgb[2]})` : null;
   }
 
+  // Irina's faces, declared again inside the frame. The URLs are her own
+  // /static/fonts, which the proxy makes same-origin.
+  const FONTS = `@font-face{font-family:"Instrument Sans";font-style:normal;`
+    + `font-weight:400 700;font-display:swap;`
+    + `src:url("/static/fonts/InstrumentSans-var.woff2") format("woff2")}`
+    + `@font-face{font-family:"JetBrains Mono";font-style:normal;font-weight:100 800;`
+    + `font-display:swap;src:url("/static/fonts/JetBrainsMono-var.woff2") format("woff2")}`
+    + `@font-face{font-family:"Playfair Display SC";font-style:normal;font-weight:400;`
+    + `font-display:swap;src:url("/static/fonts/PlayfairDisplaySC-400.woff2") format("woff2")}`;
+
   function themeCss() {
     const root = getComputedStyle(document.documentElement);
     const raw = (name) => root.getPropertyValue(name).trim();
@@ -172,7 +182,19 @@
     if (radius) lines.push(`--radius:${radius}`);
 
     const important = lines.map((d) => `${d} !important`).join(";");
-    let css = `:root,.dark,.light{${important}}`;
+    // Irina's own faces, loaded from her origin — the frame is same-origin
+    // through the proxy, so the files are reachable and already warm in cache.
+    // Without this, Laminar keeps Manrope/Inter/General Sans and the two halves
+    // of the page are set in different type.
+    let css = FONTS
+      + `:root{--irina-sans:"Instrument Sans","Helvetica Neue",Arial,sans-serif;`
+      + `--irina-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace}`
+      + `:root,.dark,.light{${important}}`
+      + `html,body,button,input,select,textarea{`
+      + `font-family:var(--irina-sans) !important}`
+      // Code stays monospace, but Irina's monospace.
+      + `code,pre,kbd,samp,.font-mono,.cm-editor,.cm-editor .cm-content{`
+      + `font-family:var(--irina-mono) !important}`;
     // The token chain is Laminar's, and the page ground turned out not to be
     // drawn through the surface scale. Painting the two elements that hold it
     // directly is ours, and it is what actually makes the page follow.

@@ -241,8 +241,8 @@ def _rail(html: str) -> str:
     html = html.replace(
         '<a href="#compare/models"',
         '<a data-grp="llmops" hidden href="#laminar" data-v="laminar" '
-        'data-short="X" aria-label="Laminar">'
-        '<span class="lbl">Laminar</span></a>\n  '
+        'data-short="X" aria-label="Observability and Evaluation Lab">'
+        '<span class="lbl">Observability and Evaluation Lab</span></a>\n  '
         '<a data-grp="llmops" hidden href="#observation" data-v="observation" '
         'data-short="L" aria-label="Observation Lab">'
         '<span class="lbl">Observation Lab</span></a>\n  '

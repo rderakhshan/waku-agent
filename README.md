@@ -81,6 +81,83 @@ uv run python -m concentric.demo        # offline proof, no key, no spend
 Every seat runs on **DeepSeek** by default. That default is one line in
 `concentric/__init__.py`, and changing it there changes the whole department.
 
+### Laminar — traces and evals (optional, needs Docker)
+
+Irina writes one trace per run to a local [Laminar](https://github.com/lmnr-ai/lmnr)
+instance: the trajectory, every seat it used, every hand-off, every model call,
+and the per-run scores. Nothing else in Irina needs it — skip this whole section
+and the department still runs. It is **on by default** once configured;
+`IRINA_LAMINAR=off` turns it off, and a run is indexed locally either way.
+
+**1. Run Laminar locally.** Five containers — frontend, app-server, Postgres,
+ClickHouse, Quickwit:
+
+```bash
+git clone https://github.com/lmnr-ai/lmnr && cd lmnr
+docker compose up -d          # the UI lands at http://localhost:5667
+```
+
+**2. Serve it under `/laminar`.** Irina embeds the UI in a rail page, and
+Laminar refuses to be framed (`X-Frame-Options: DENY`), so the launcher proxies
+it and strips exactly those headers. Next bakes its asset paths in at build
+time, so the frontend has to be built with a base path:
+
+```bash
+docker build --build-arg NEXT_PUBLIC_BASE_PATH=/laminar \
+  -t irina-laminar-frontend:latest ./frontend
+
+cat > docker-compose.irina.yml <<'YAML'
+services:
+  frontend:
+    image: irina-laminar-frontend:latest
+    pull_policy: never
+YAML
+
+docker compose -f docker-compose.yml -f docker-compose.irina.yml up -d
+```
+
+(The published `ghcr.io/lmnr-ai/frontend-ee-basepath` image is the same idea, but
+it is the EE build and its ClickHouse migrations disagree with an OSS database,
+so it exits on startup. Building the OSS frontend keeps one schema.)
+
+**3. Create a project, then give Irina its key.**
+
+- Open <http://localhost:5667/laminar> and sign in with any email — self-hosted
+  Laminar lets anyone in by default.
+- Create a project, then copy the API key from **Project settings**.
+- Put it in `.env`:
+
+```bash
+LMNR_PROJECT_API_KEY=<the key you copied>
+LMNR_BASE_URL=http://localhost
+LMNR_HTTP_PORT=8000
+LMNR_GRPC_PORT=8001
+```
+
+That is the whole setup. From then on every run is traced, and each conversation
+becomes one Laminar **session** — `session.session_id`, the same id the chat log
+already groups by.
+
+**4. Where to look.**
+
+- **Traces** — one per run: `trajectory.irina` → `seat.<role>` → hand-offs →
+  model calls, with tokens and cost.
+- **The rail page** — **LLMOps → Observability and Evaluation Lab** embeds the
+  UI inside Irina's dashboard, in Irina's own theme and type.
+- **Sessions** — every trajectory of one conversation, together.
+
+**5. Scores.** Laminar's evals are dataset → executor → evaluators, and here the
+executor is the real department:
+
+```bash
+uv run python -m concentric.laminar_evals            # every datapoint
+uv run python -m concentric.laminar_evals --limit 1  # one, as a smoke test
+```
+
+Each datapoint is one real department turn, so it costs what a turn costs.
+
+Full detail, including what it does and does not record: [docs/laminar.md](docs/laminar.md).
+
 ### Waku is still here, and still works
 
 Irina is twenty-four Waku agents, so the runtime underneath is yours to drive directly, exactly
