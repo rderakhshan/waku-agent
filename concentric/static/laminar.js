@@ -85,12 +85,27 @@
     "--secondary": "--surface-raised",
     "--secondary-foreground": "--text-ink",
     "--muted": "--surface-raised",
+    "--muted-foreground": "--text-muted",
     "--accent": "--surface-raised",
     "--accent-foreground": "--text-ink",
+    "--primary-foreground": "--accent-ink",
+    "--chart-1": "--chart-1",
+    "--chart-2": "--chart-2",
     "--destructive": "--bad",
     "--border": "--rule",
     "--input": "--rule",
     "--ring": "--accent",
+    // The sidebar keeps a palette of its own — shadcn's sidebar reads
+    // `hsl(var(--sidebar-*))`, not the surface scale, so it stayed dark while
+    // everything around it followed.
+    "--sidebar-background": "--surface-paper",
+    "--sidebar-foreground": "--text-ink",
+    "--sidebar-primary": "--accent",
+    "--sidebar-primary-foreground": "--accent-ink",
+    "--sidebar-accent": "--surface-raised",
+    "--sidebar-accent-foreground": "--text-ink",
+    "--sidebar-border": "--rule",
+    "--sidebar-ring": "--accent",
   };
 
   // --- building the theme -----------------------------------------------------
