@@ -954,10 +954,13 @@ body:has(.rail.collapsed) { --rail-w: 60px; }
   background:var(--surface-paper);font-family:var(--face-mono);font-size:var(--text-xs);
   color:var(--text-ink);line-height:1.45}
 
-/* Holders wrap, and the extras are counted: a card is not a place to print a
-   department, so beyond a couple of names the rest are a number. */
-.tool-holders{display:flex;flex-wrap:wrap;gap:calc(var(--spacing) * 0.5);max-width:100%}
-.tool-more{cursor:help;color:var(--text-muted)}
+/* The action row holds the holder chips and a button. waku's `.provactions` is a
+   flex row with no wrap, so a second holder pushed the button straight past the
+   card's edge — the frame you could see hanging over the border. */
+.connactions{flex-wrap:wrap;align-items:center}
+.connactions .btn{flex:none}
+.tool-holders{display:flex;flex-wrap:wrap;gap:calc(var(--spacing) * 0.5);
+  flex:1 1 auto;min-width:0;max-width:100%}
 /* the lab's argument rows — one line per argument, assembled into a schema */
 .arg-row{display:grid;grid-template-columns:minmax(90px,1fr) 96px minmax(110px,1.4fr) auto auto;
   gap:calc(var(--spacing) * 0.5);align-items:center;margin-bottom:calc(var(--spacing) * 0.5)}

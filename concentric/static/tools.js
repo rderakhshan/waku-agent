@@ -67,23 +67,17 @@
     return ["not-configured", "nobody"];
   }
 
-  const SHOWN = 2;   // chips printed before the rest are counted
-
   function chips(t) {
     const who = held(t);
     // The pill above already says "nobody", so saying it twice was noise — and
     // as a wrapping span in a flex row it also broke the row's layout.
     if (!who.length) return "";
-    const shown = who.slice(0, SHOWN).map((role) => `<span class="tool-chip">${esc(role)}
+    // Every holder by name, wrapping onto as many lines as it takes. Counting
+    // the extras behind a "+2" hid the one thing the reader came to the card to
+    // find out, and a tool with a handful of owners is not a department.
+    return `<span class="tool-holders">${who.map((role) => `<span class="tool-chip">${esc(role)}
       <button type="button" class="tool-x" title="remove"
-        onclick="toolDrop('${t.name}','${role}')">${icon("cross")}</button></span>`).join("");
-    // A specialised tool has one owner, so a card rarely needs more than a name.
-    // When it does, the extra are counted rather than printed: a card is not a
-    // place to list a department, and the full list is in the tooltip.
-    const rest = who.length - SHOWN;
-    const more = rest > 0
-      ? `<span class="tool-chip tool-more" title="${esc(who.join(", "))}">+${rest}</span>` : "";
-    return `<span class="tool-holders">${shown}${more}</span>`;
+        onclick="toolDrop('${t.name}','${role}')">${icon("cross")}</button></span>`).join("")}</span>`;
   }
 
   function card(t) {
